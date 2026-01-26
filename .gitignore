@@ -1,0 +1,100 @@
+# Built application files
+*.apk
+*.aab
+*.ap_
+
+# Files for the ART/Dalvik VM
+*.dex
+
+# Java class files
+*.class
+
+# Generated files
+bin/
+gen/
+out/
+build/
+/build
+
+# Gradle files
+.gradle/
+gradle-app.setting
+!gradle-wrapper.jar
+!gradle-wrapper.properties
+
+# Local configuration file (SDK path, credentials, etc)
+local.properties
+env.properties
+
+# IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+*.ipr
+.idea/workspace.xml
+.idea/tasks.xml
+.idea/gradle.xml
+.idea/assetWizardSettings.xml
+.idea/dictionaries
+.idea/libraries
+.idea/jarRepositories.xml
+.idea/compiler.xml
+.idea/misc.xml
+.idea/modules.xml
+.idea/vcs.xml
+/.idea
+
+# Android Studio Navigation editor temp files
+.navigation/
+
+# Android Studio captures folder
+/captures
+captures/
+
+# Keystore files
+*.jks
+*.keystore
+key.properties
+
+# External native build folder generated in Android Studio 2.2 and later
+.externalNativeBuild
+.cxx
+/externalNativeBuild
+
+# OS-specific files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Backup files
+*~
+*.swp
+*.swo
+*.bak
+*.backup
+
+# Logs
+*.log
+
+# Kotlin
+*.kt.swp
+
+# Proguard
+proguard/
+mapping.txt
+
+# Lint
+lint/
+lint-results.xml
+lint-results_files/
+
+# Android Profiling
+*.hprof
+
+# Build outputs
+release/
+debug/

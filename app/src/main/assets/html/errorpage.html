@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Error</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background-color: #f9f9f9;
+            flex-direction: column;
+            display: flex;
+            justify-content: center; /* Vertically center */
+            align-items: center; /* Horizontally center */
+            margin: 0;
+            padding: 20px; /* Added padding for smaller screens */
+            box-sizing: border-box; /* Prevent overflow */
+        }
+        .wrapper {
+            margin-top: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+        img {
+            width: 150px;
+            height: auto;
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #d9534f;
+            font-size: 24px;
+            margin: 0 0 10px;
+        }
+        p {
+            color: #5a5a5a;
+            font-size: 18px;
+            margin: 5px 0;
+        }
+
+        /* Responsive adjustments */
+        @media (min-width: 600px) {
+            h1 {
+                font-size: 28px; /* Increase font size for larger screens */
+            }
+            p {
+                font-size: 20px; /* Increase font size for larger screens */
+            }
+        }
+        .loader {
+          width: 16px;
+          height: 16px;
+          border-radius: 50%;
+          display: block;
+          margin:15px auto;
+          position: relative;
+          background: #f9f9f9;
+          box-shadow: -24px 0 #FFF, 24px 0 #FFF;
+          box-sizing: border-box;
+          animation: shadowPulse 2s linear infinite;
+        }
+
+        @keyframes shadowPulse {
+          33% {
+            background: #FFF;
+            box-shadow: -24px 0 #EEDA02, 24px 0 #FFF;
+          }
+          66% {
+            background: #EEDA02;
+            box-shadow: -24px 0 #FFF, 24px 0 #FFF;
+          }
+          100% {
+            background: #FFF;
+            box-shadow: -24px 0 #FFF, 24px 0 #EEDA02;
+          }
+        }
+    </style>
+</head>
+<body>
+<div class="wrapper">
+    <img src="logo_dpr.png" alt="Logo">
+    <span class="loader"></span>
+</div>
+</body>
+</html>

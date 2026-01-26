@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">Cosmic</string>
+    <string name="title_activity_wake_up">WakeUpActivity</string>
+</resources>
