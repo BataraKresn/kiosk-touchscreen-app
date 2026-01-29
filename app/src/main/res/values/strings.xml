@@ -1,4 +1,5 @@
 <resources>
     <string name="app_name">Cosmic</string>
     <string name="title_activity_wake_up">WakeUpActivity</string>
+    <string name="accessibility_service_description">Cosmic Remote Control allows administrators to remotely control this device from the CMS web dashboard. This service is used to inject touch and keyboard input commands received from the remote control session.</string>
 </resources>
