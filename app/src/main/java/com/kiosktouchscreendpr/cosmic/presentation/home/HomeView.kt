@@ -12,10 +12,7 @@ import android.widget.LinearLayout
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -75,6 +72,13 @@ fun HomeViewRoot(
 
     LaunchedEffect(Unit) {
         viewModel.observeNetworks {
+            resetToHomePage()
+        }
+    }
+    
+    // Periodic refresh setiap 1 menit untuk check schedule changes
+    LaunchedEffect(Unit) {
+        viewModel.startPeriodicRefresh {
             resetToHomePage()
         }
     }
@@ -227,14 +231,12 @@ fun HomeView(
             }
         )
 
-        Column(
-            modifier = Modifier.matchParentSize(),
-            verticalArrangement = Arrangement.SpaceBetween
-        ) {
+        Box(modifier = Modifier.fillMaxSize()) {
             Button(
                 modifier = Modifier
                     .height(50.dp)
-                    .width(50.dp),
+                    .width(50.dp)
+                    .align(Alignment.TopStart),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = Color.Transparent,
                 ),
@@ -251,7 +253,9 @@ fun HomeView(
             )
 
             Button(
-                modifier = Modifier.padding(24.dp),
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(24.dp),
                 onClick = {
                     onHomeClick()
                 },
@@ -267,6 +271,26 @@ fun HomeView(
                     contentDescription = null
                 )
             }
+
+            // Hidden refresh button (top-right corner, 5 taps)
+            Button(
+                modifier = Modifier
+                    .height(50.dp)
+                    .width(50.dp)
+                    .align(Alignment.TopEnd),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color.Transparent,
+                ),
+                onClick = {
+                    tapCount++
+                    if (tapCount == 5) {
+                        onHomeClick() // Manual refresh
+                        tapCount = 0
+                    }
+                },
+                interactionSource = remember { MutableInteractionSource() },
+                content = {}
+            )
         }
         if (progress in 1..99) {
             Box(

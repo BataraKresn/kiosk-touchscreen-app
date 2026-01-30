@@ -12,7 +12,6 @@ import androidx.compose.ui.graphics.toArgb
 import com.kiosktouchscreendpr.cosmic.app.App
 import com.kiosktouchscreendpr.cosmic.core.apprequest.AppRequest
 import com.kiosktouchscreendpr.cosmic.core.utils.NetworkObserver
-import com.kiosktouchscreendpr.cosmic.core.utils.VNCController
 import com.kiosktouchscreendpr.cosmic.core.utils.WakeService
 import com.kiosktouchscreendpr.cosmic.core.utils.setupLegacySystemUI
 import com.kiosktouchscreendpr.cosmic.core.utils.setupModernSystemUI
@@ -35,7 +34,6 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        VNCController.startVNCServer(this, PWD)
         networkObserver.register()
         setupSystemUi()
         enableEdgeToEdge(

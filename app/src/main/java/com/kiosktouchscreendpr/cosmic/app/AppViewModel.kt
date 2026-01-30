@@ -1,5 +1,7 @@
 package com.kiosktouchscreendpr.cosmic.app
 
+import android.os.Build
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kiosktouchscreendpr.cosmic.BuildConfig
@@ -9,6 +11,7 @@ import com.kiosktouchscreendpr.cosmic.core.utils.ConnectivityObserver
 import com.kiosktouchscreendpr.cosmic.core.utils.Preference
 import com.kiosktouchscreendpr.cosmic.core.utils.formatLink
 import com.kiosktouchscreendpr.cosmic.core.utils.getDeviceIP
+import com.kiosktouchscreendpr.cosmic.data.api.DeviceApi
 import com.kiosktouchscreendpr.cosmic.data.datasource.heartbeat.Message
 import com.kiosktouchscreendpr.cosmic.domain.usecase.WebSocketUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -18,6 +21,7 @@ import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.util.UUID
 import javax.inject.Inject
 
 /**
@@ -29,7 +33,8 @@ import javax.inject.Inject
 class AppViewModel @Inject constructor(
     private val preference: Preference,
     private val heartBeat: WebSocketUseCase,
-    private val connectivityObserver: ConnectivityObserver
+    private val connectivityObserver: ConnectivityObserver,
+    private val deviceApi: DeviceApi
 ) : ViewModel() {
 
     private val ipAddress: String? = getDeviceIP()
@@ -41,6 +46,7 @@ class AppViewModel @Inject constructor(
     private val _state = MutableStateFlow(AppState())
     val state = _state
         .onStart {
+            registerDeviceOnFirstLaunch()
             observeNetwork()
             observeWsMessages()
         }
@@ -104,6 +110,65 @@ class AppViewModel @Inject constructor(
                 else -> Unit
             }
         }
+    }
+
+    /**
+     * Register device pada first launch (untuk Remote menu)
+     * Call POST /api/devices/register dengan device_id dan device info
+     * Save remote_id & remote_token untuk keperluan remote control
+     */
+    private fun registerDeviceOnFirstLaunch() = viewModelScope.launch {
+        try {
+            // Generate atau ambil device_id yang sudah ada
+            val deviceId = getOrCreateDeviceId()
+            
+            val baseUrl = BuildConfig.WEBVIEW_BASEURL
+            val deviceName = "${Build.MANUFACTURER} ${Build.MODEL}".uppercase()
+            
+            val response = deviceApi.registerRemoteDevice(
+                baseUrl = baseUrl,
+                deviceId = deviceId,
+                deviceName = deviceName,
+                appVersion = BuildConfig.VERSION_NAME
+            )
+            
+            if (response != null && response.success) {
+                // Save remote_id & remote_token untuk remote control
+                preference.set(AppConstant.REMOTE_ID, response.data.remoteId.toString())
+                preference.set(AppConstant.REMOTE_TOKEN, response.data.token)
+                
+                Log.d(TAG, "✅ Remote registered: remote_id=${response.data.remoteId}, device_id=$deviceId")
+            } else {
+                Log.w(TAG, "⚠️ Failed to register remote, but continuing anyway")
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "⚠️ Error registering remote on first launch: ${e.message}")
+        }
+    }
+
+    /**
+     * Generate device_id unik atau ambil dari SharedPreferences jika sudah ada
+     */
+    private fun getOrCreateDeviceId(): String {
+        val savedDeviceId = preference.get(AppConstant.DEVICE_ID, null)
+        
+        return if (savedDeviceId.isNullOrBlank()) {
+            // Generate device_id baru dari Build.SERIAL atau UUID
+            val newDeviceId = Build.SERIAL.takeIf { it != "unknown" }
+                ?: UUID.randomUUID().toString().take(12)
+            
+            // Simpan ke SharedPreferences
+            preference.set(AppConstant.DEVICE_ID, newDeviceId)
+            
+            Log.d(TAG, "Generated new device_id: $newDeviceId")
+            newDeviceId
+        } else {
+            savedDeviceId
+        }
+    }
+
+    companion object {
+        private const val TAG = "AppViewModel"
     }
 }
 

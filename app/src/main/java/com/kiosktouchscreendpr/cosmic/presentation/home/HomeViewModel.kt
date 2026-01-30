@@ -89,6 +89,18 @@ class HomeViewModel @Inject constructor(
             }
         }
     }
+    
+    /**
+     * Periodic check untuk schedule changes setiap 1 menit
+     * Jika admin assign schedule di CMS, WebView akan auto-reload
+     */
+    fun startPeriodicRefresh(reload: () -> Unit) = viewModelScope.launch {
+        while (true) {
+            delay(60_000L) // 1 menit
+            println("⏰ Periodic refresh check...")
+            reload()
+        }
+    }
 
     fun onUrlChanged(currentUrl: String) {
         val onBasePage = currentUrl == state.value.baseUrl

@@ -14,8 +14,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Clear
 import androidx.compose.material.icons.rounded.Lock
@@ -148,43 +150,101 @@ fun SettingsScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        TextField(
+        // Token Input dengan Generate Button
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp)
-                .heightIn(min = 50.dp, max = 200.dp),
-            value = state.token,
-            onValueChange = { onAction(SettingsEvent.OnTokenChanged(it)) },
-            label = { Text("Enter Token") },
-            shape = MaterialTheme.shapes.medium,
-            leadingIcon = {
-                val token = state.token
-                if (token.isEmpty()) {
-                    Icon(
-                        imageVector = Icons.Rounded.Lock,
-                        contentDescription = "Lock",
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Rounded.Clear,
-                        contentDescription = "Clear",
-                        modifier = Modifier.clickable {
-                            onAction(SettingsEvent.OnTokenChanged(""))
-                        }
-                    )
-                }
-            },
-            colors = TextFieldDefaults.colors(
-                unfocusedIndicatorColor = Color.Transparent,
-                focusedIndicatorColor = Color.Transparent,
-            ),
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-            keyboardActions = KeyboardActions(
-                onDone = {
-                    keyboardController?.hide()
-                }
+                .padding(horizontal = 16.dp)
+        ) {
+            Text(
+                text = "Display Name",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 4.dp)
             )
-        )
+            
+            TextField(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 50.dp, max = 200.dp),
+                value = state.token,
+                onValueChange = { onAction(SettingsEvent.OnTokenChanged(it)) },
+                label = { Text("Enter Display Name") },
+                placeholder = { Text("Lobby TV") },
+                supportingText = {
+                    Text(
+                        text = "Nama ini digunakan untuk URL: /display/${state.token.ifEmpty { "DISPLAY" }}",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                },
+                shape = MaterialTheme.shapes.medium,
+                leadingIcon = {
+                    val token = state.token
+                    if (token.isEmpty()) {
+                        Icon(
+                            imageVector = Icons.Rounded.Lock,
+                            contentDescription = "Lock",
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Rounded.Clear,
+                            contentDescription = "Clear",
+                            modifier = Modifier.clickable {
+                                onAction(SettingsEvent.OnTokenChanged(""))
+                            }
+                        )
+                    }
+                },
+                colors = TextFieldDefaults.colors(
+                    unfocusedIndicatorColor = Color.Transparent,
+                    focusedIndicatorColor = Color.Transparent,
+                ),
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(
+                    onDone = {
+                        keyboardController?.hide()
+                    }
+                )
+            )
+            
+            // Generate Token Button
+            TextButton(
+                onClick = { onAction(SettingsEvent.OnRefreshTokens) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp)
+            ) {
+                Text(if (state.isLoadingTokens) "Loading display CMS..." else "🔄 Ambil Display dari CMS")
+            }
+
+            if (!state.tokenLoadError.isNullOrBlank()) {
+                Text(
+                    text = state.tokenLoadError ?: "",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+            }
+
+            if (state.availableTokens.isNotEmpty()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp)
+                        .heightIn(max = 180.dp)
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    state.availableTokens.forEach { tokenItem ->
+                        TextButton(
+                            onClick = { onAction(SettingsEvent.OnSelectToken(tokenItem)) },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(tokenItem)
+                        }
+                    }
+                }
+            }
+        }
 
         TextField(
             modifier = Modifier

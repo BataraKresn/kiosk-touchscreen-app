@@ -7,6 +7,9 @@ package com.kiosktouchscreendpr.cosmic.core.constant
 
 object AppConstant {
     const val AUTH = "auth"
+    const val DEVICE_ID = "device_id"
+    const val REMOTE_ID = "remote_id"
+    const val REMOTE_TOKEN = "remote_token"
     const val TOKEN = "token"
     const val TIMEOUT = "timeout"
     const val POWER_OFF = "power_off"

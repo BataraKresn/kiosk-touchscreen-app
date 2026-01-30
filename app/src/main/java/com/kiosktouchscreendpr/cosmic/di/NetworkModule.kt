@@ -1,6 +1,7 @@
 package com.kiosktouchscreendpr.cosmic.di
 
 import com.kiosktouchscreendpr.cosmic.BuildConfig
+import com.kiosktouchscreendpr.cosmic.data.api.DeviceApi
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -64,5 +65,11 @@ object NetworkModule {
             isLenient = true
             encodeDefaults = true
         }
+    }
+    
+    @Provides
+    @Singleton
+    fun provideDeviceApi(client: HttpClient): DeviceApi {
+        return DeviceApi(client)
     }
 }

@@ -233,7 +233,7 @@ class InputInjectionService : AccessibilityService() {
                 val rootNode = rootInActiveWindow
                 if (rootNode != null) {
                     // Find focused EditText and paste
-                    val focusedNode = rootNode.findFocus(AccessibilityEvent.FOCUS_INPUT)
+                    val focusedNode = rootNode.findFocus(android.view.accessibility.AccessibilityNodeInfo.FOCUS_INPUT)
                     if (focusedNode != null) {
                         val arguments = android.os.Bundle()
                         arguments.putCharSequence(

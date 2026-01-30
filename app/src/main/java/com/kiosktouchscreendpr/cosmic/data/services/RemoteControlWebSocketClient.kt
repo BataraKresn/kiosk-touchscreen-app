@@ -66,8 +66,7 @@ class RemoteControlWebSocketClient @Inject constructor(
     // Frame queue (buffered channel)
     private val frameQueue = MutableSharedFlow<ByteArray>(
         replay = 0,
-        extraBufferCapacity = MAX_QUEUED_FRAMES,
-        onBufferOverflow = BufferOverflow.DROP_OLDEST
+        extraBufferCapacity = MAX_QUEUED_FRAMES
     )
     
     // Connection state flow

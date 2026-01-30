@@ -7,4 +7,7 @@ data class SettingsState(
     val timeout: String = "",
     val powerOffTime: Pair<Int, Int>? = null,
     val powerOnTime: Pair<Int, Int>? = null,
+    val availableTokens: List<String> = emptyList(),
+    val isLoadingTokens: Boolean = false,
+    val tokenLoadError: String? = null,
 )

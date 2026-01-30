@@ -45,9 +45,9 @@ class RemoteControlViewModel @Inject constructor(
                 
                 // Initialize WebSocket connection
                 webSocketClient.connect(
-                    url = relayServerUrl,
-                    deviceId = deviceId,
-                    authToken = authToken
+                    wsUrl = relayServerUrl,
+                    token = authToken,
+                    devId = deviceId
                 )
                 
                 _connectionStatus.value = ConnectionStatus.Connected
