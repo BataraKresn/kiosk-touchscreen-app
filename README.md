@@ -4,6 +4,27 @@
   <strong>Enterprise-grade Android Kiosk application for Digital Signage & Content Display</strong>
 </p>
 
+## 🎉 Quick Start
+
+✅ **App Status:** Installed & Running  
+✅ **Device:** RR8R309LDWL  
+✅ **APK Size:** 23.2 MB  
+✅ **Password:** `260224`
+
+### 📱 Cara Pakai Sekarang
+
+1. Masukkan password: **260224**
+2. Tekan OK
+3. Dashboard akan muncul dari https://kiosk.mugshot.dev
+
+### 🔐 Ganti Password
+
+1. Edit `env.properties`
+2. Ubah `APP_PASSWORD=260224` ke password baru
+3. Rebuild & reinstall
+
+---
+
 ## 📋 Overview
 
 Cosmic Kiosk adalah aplikasi Android native yang didesain khusus untuk digital signage dan kiosk display. Aplikasi ini menampilkan konten web dari Cosmic Media Streaming Platform dengan fitur kiosk mode lengkap, auto-refresh, dan remote control melalui WebSocket.
@@ -179,6 +200,159 @@ defaultConfig {
     buildConfigField("String", "WEBVIEW_BASEURL", "\"${envProperties["WEBVIEW_BASEURL"]}\"")
 }
 ```
+
+## 🎯 Quick Commands
+
+```powershell
+# Build APK (OneDrive-safe method)
+.\ps1_clis_power_shell\build.ps1
+
+# Install APK to device
+.\ps1_clis_power_shell\install.ps1
+
+# Launch app on device
+.\ps1_clis_power_shell\launch-app.ps1
+
+# View live logs
+.\ps1_clis_power_shell\debug-live.ps1
+
+# Force build (if issues)
+.\ps1_clis_power_shell\force-build.ps1
+
+# Check errors
+.\ps1_clis_power_shell\check-errors.ps1
+```
+
+---
+
+## 📚 Documentation
+
+📁 **Semua dokumentasi lengkap ada di folder [doc/](doc/)** - Lihat [PROJECT_STRUCTURE.md](doc/PROJECT_STRUCTURE.md) untuk struktur lengkap.
+
+### 🚀 Getting Started
+| File | Purpose |
+|------|---------|
+| [QUICK_START.md](doc/QUICK_START.md) | Panduan cepat mulai |
+| [SETUP_COMPLETE.md](doc/SETUP_COMPLETE.md) | Setup completion checklist |
+
+### 🔧 Build & Deploy
+| File | Purpose |
+|------|---------|
+| [BUILD_SUCCESS.md](doc/BUILD_SUCCESS.md) | Panduan build APK |
+| [INSTALL_GUIDE.md](doc/INSTALL_GUIDE.md) | Panduan instalasi |
+| [FIX_BUILD_ERROR.md](doc/FIX_BUILD_ERROR.md) | Fix OneDrive build errors |
+
+### 🐛 Debug & Troubleshoot
+| File | Purpose |
+|------|---------|
+| [DEBUG_GUIDE.md](doc/DEBUG_GUIDE.md) | Panduan debugging lengkap |
+| [README_DEBUG.md](doc/README_DEBUG.md) | Debug quick reference |
+| [COMMANDS.md](doc/COMMANDS.md) | Useful commands |
+
+### 🔌 Backend Integration
+| File | Purpose |
+|------|---------|
+| [BACKEND_INTEGRATION.md](doc/BACKEND_INTEGRATION.md) | Integrasi dengan backend |
+| [BACKEND_API_REQUIRED.md](doc/BACKEND_API_REQUIRED.md) | Backend API requirements |
+| [TOKEN_GUIDE.md](doc/TOKEN_GUIDE.md) | Token management |
+| [SOLUTION_TOKEN_404.md](doc/SOLUTION_TOKEN_404.md) | Token 404 solutions |
+
+### 🛠️ Tools & Setup
+| File | Purpose |
+|------|---------|
+| [ADB_FIXED.md](doc/ADB_FIXED.md) | Setup ADB |
+| [PASSWORD_FIXED.md](doc/PASSWORD_FIXED.md) | Password troubleshooting |
+| [PLAY_PROTECT_FIX.md](doc/PLAY_PROTECT_FIX.md) | Google Play Protect issues |
+
+---
+
+## 🔧 Build & Deploy
+
+### Prerequisites
+
+- **Android Studio** Hedgehog atau lebih baru
+- **JDK 11** atau lebih baru
+- **Android SDK 35** (Android 15)
+- **Gradle 8.11.1**
+
+### Build APK
+
+```powershell
+# Debug Build
+.\ps1_clis_power_shell\build.ps1
+
+# Release Build
+.\gradlew.bat assembleRelease
+
+# Force Build (fix OneDrive issues)
+.\ps1_clis_power_shell\force-build.ps1
+```
+
+### Install to Device
+
+```powershell
+# Via PowerShell script
+.\ps1_clis_power_shell\install-apk.ps1
+
+# Manual ADB
+adb install -r app\build\outputs\apk\debug\app-debug.apk
+```
+
+---
+
+## 🐛 Troubleshooting
+
+### Video Loading Issue (Spinning Loading)
+
+**Root Cause:** Backend JavaScript `setInterval(() => displayScreen(data), 60000)` reload semua DOM termasuk video setiap 60 detik.
+
+**Solution (Backend):**
+```javascript
+// ❌ BAD: Always reload
+setInterval(() => {
+    displayScreen(data);
+}, 60000);
+
+// ✅ GOOD: Only reload if schedule changed
+let currentScheduleId = data.schedule_id;
+setInterval(() => {
+    fetch('/api/current-schedule?display_id=XXX')
+        .then(r => r.json())
+        .then(newData => {
+            if (newData.schedule_id !== currentScheduleId) {
+                currentScheduleId = newData.schedule_id;
+                displayScreen(newData);
+            }
+        });
+}, 60000);
+```
+
+**Logs menunjukkan:**
+- MediaCodec cycling setiap 5-12 detik
+- Video restart loop karena DOM reload
+- APK code sudah oke, tidak perlu fix
+
+### Build Errors (OneDrive)
+
+```powershell
+# Option 1: Skip clean
+.\gradlew.bat assembleDebug --no-daemon --no-build-cache
+
+# Option 2: Force build
+.\ps1_clis_power_shell\force-build.ps1
+
+# Option 3: Move to local disk
+robocopy . C:\dev\kiosk-touchscreen-app /E
+cd C:\dev\kiosk-touchscreen-app
+```
+
+### Device Not Detected
+
+```powershell
+.\ps1_clis_power_shell\setup-adb.ps1
+```
+
+---
 
 ## 📱 Key Components
 
@@ -484,45 +658,24 @@ Aplikasi ini berkomunikasi dengan **Cosmic Media Streaming Platform** (Laravel):
 - WebView: `http://localhost:8080`
 - WebSocket: `ws://localhost:8080`
 
-## 🔍 Troubleshooting
+## 🔍 Additional Resources
 
-### App Not Auto-starting on Boot
+### PowerShell Scripts (ps1_clis_power_shell/)
+- `build.ps1` - Build APK dengan OneDrive-safe method
+- `install-apk.ps1` - Install APK ke device
+- `launch-app.ps1` - Launch app on device
+- `debug-live.ps1` - Live debugging dengan filter
+- `force-build.ps1` - Aggressive build fix untuk OneDrive issues
+- `check-errors.ps1` - Quick error check
+- `view-logs.ps1` - View logs dengan filtering
+- `troubleshoot.ps1` - Quick diagnosis tool
+- `setup-adb.ps1` - Setup ADB environment
 
-```bash
-# Check if permission granted
-adb shell dumpsys battery
-
-# Enable battery optimization exception
-adb shell cmd appops set com.kiosktouchscreendpr.cosmic REQUEST_IGNORE_BATTERY_OPTIMIZATIONS allow
-```
-
-### WebView Not Loading
-
-1. Check internet connection
-2. Verify `WEBVIEW_BASEURL` in `env.properties`
-3. Check Logcat for errors:
-   ```bash
-   adb logcat -s "Home:*" "WebView:*"
-   ```
-
-### WebSocket Connection Failed
-
-1. Verify `WS_URL` is correct (wss:// not https://)
-2. Check if server WebSocket endpoint is accessible
-3. Review firewall/proxy settings
-
-### Media Not Auto-playing
-
-- Verify `mediaPlaybackRequiresUserGesture = false` in WebView settings
-- Check if media has proper MIME type
-- Ensure HTTPS (auto-play restricted on HTTP)
-
-## 📄 License
-
-[Your License Here]
+### Documentation (doc/)
+Complete documentation untuk semua aspek development, troubleshooting, dan deployment.
 
 ---
 
 **Developed with ❤️ for Cosmic Media Streaming Platform**
 
-**Last Updated:** January 26, 2026
+**Last Updated:** January 31, 2026
