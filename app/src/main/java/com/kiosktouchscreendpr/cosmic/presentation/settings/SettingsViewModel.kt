@@ -32,6 +32,9 @@ class SettingsViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(SettingsState())
+    
+    // Mapping NAME → TOKEN dari CMS
+    private var displayNameToToken = mutableMapOf<String, String>()
 
     val state: StateFlow<SettingsState> = _state
         .onStart { loadSettings() }
@@ -66,7 +69,9 @@ class SettingsViewModel @Inject constructor(
             }
 
             is SettingsEvent.OnSelectToken -> {
-                _state.value = _state.value.copy(token = event.token)
+                // event.token adalah NAME, convert ke TOKEN
+                val actualToken = displayNameToToken[event.token] ?: event.token
+                _state.value = _state.value.copy(token = actualToken)
             }
 
             SettingsEvent.OnSubmit -> {
@@ -173,8 +178,17 @@ class SettingsViewModel @Inject constructor(
         try {
             val baseUrl = BuildConfig.WEBVIEW_BASEURL
             val response = deviceApi.getDisplays(baseUrl, perPage = 50)
+            
+            // Build mapping NAME → TOKEN
+            displayNameToToken.clear()
+            response?.data?.forEach { display ->
+                if (display.name != null && display.token != null) {
+                    displayNameToToken[display.name] = display.token
+                }
+            }
+            
             val tokens = response?.data
-                ?.mapNotNull { it.name }  // ✅ Pakai NAME - Backend support name lookup
+                ?.mapNotNull { it.name }  // Show NAME di dropdown
                 ?.distinct()
                 ?.sorted()
                 ?: emptyList()

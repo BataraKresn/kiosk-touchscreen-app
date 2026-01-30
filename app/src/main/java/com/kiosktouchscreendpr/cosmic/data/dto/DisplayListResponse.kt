@@ -22,7 +22,10 @@ data class DisplayListItem(
     val id: Int,
 
     @SerialName("name")
-    val name: String? = null
+    val name: String? = null,
+    
+    @SerialName("token")
+    val token: String? = null
 )
 
 @Serializable
