@@ -195,7 +195,13 @@ class DeviceHealthMonitor @Inject constructor(
                     
                     if (temp != null) {
                         // Temperature is usually in millidegrees, convert to Celsius
-                        return if (temp > 1000) temp / 1000f else temp
+                        val celsius = if (temp > 1000) temp / 1000f else temp
+                        
+                        // Validate temperature is in reasonable range (-50°C to 150°C)
+                        // Ignore invalid sensor readings
+                        if (celsius in -50f..150f) {
+                            return celsius
+                        }
                     }
                 }
             }
