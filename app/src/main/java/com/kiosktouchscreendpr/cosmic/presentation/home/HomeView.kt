@@ -3,6 +3,7 @@ package com.kiosktouchscreendpr.cosmic.presentation.home
 import android.annotation.SuppressLint
 import android.graphics.Bitmap
 import android.util.Log
+import android.webkit.ConsoleMessage
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
@@ -200,6 +201,13 @@ fun HomeView(
                             super.onProgressChanged(view, newProgress)
                             progress = newProgress
                             Log.d("Home", "onProgressChanged: $progress")
+                        }
+
+                        override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
+                            consoleMessage?.let {
+                                Log.d("WebViewConsole", "[${it.messageLevel()}] ${it.message()} -- From line ${it.lineNumber()} of ${it.sourceId()}")
+                            }
+                            return true
                         }
                     }
 
