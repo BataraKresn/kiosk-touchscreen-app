@@ -8,13 +8,16 @@ import com.kiosktouchscreendpr.cosmic.BuildConfig
 import com.kiosktouchscreendpr.cosmic.app.AppState.Status
 import com.kiosktouchscreendpr.cosmic.core.constant.AppConstant
 import com.kiosktouchscreendpr.cosmic.core.utils.ConnectivityObserver
+import com.kiosktouchscreendpr.cosmic.core.utils.DeviceHealthMonitor
 import com.kiosktouchscreendpr.cosmic.core.utils.Preference
 import com.kiosktouchscreendpr.cosmic.core.utils.formatLink
 import com.kiosktouchscreendpr.cosmic.core.utils.getDeviceIP
 import com.kiosktouchscreendpr.cosmic.data.api.DeviceApi
+import com.kiosktouchscreendpr.cosmic.data.api.DeviceRegistrationService
 import com.kiosktouchscreendpr.cosmic.data.datasource.heartbeat.Message
 import com.kiosktouchscreendpr.cosmic.domain.usecase.WebSocketUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.onStart
@@ -34,7 +37,8 @@ class AppViewModel @Inject constructor(
     private val preference: Preference,
     private val heartBeat: WebSocketUseCase,
     private val connectivityObserver: ConnectivityObserver,
-    private val deviceApi: DeviceApi
+    private val deviceApi: DeviceApi,
+    private val deviceHealthMonitor: DeviceHealthMonitor
 ) : ViewModel() {
 
     private val ipAddress: String? = getDeviceIP()
@@ -47,6 +51,7 @@ class AppViewModel @Inject constructor(
     val state = _state
         .onStart {
             registerDeviceOnFirstLaunch()
+            startPeriodicHealthHeartbeat()
             observeNetwork()
             observeWsMessages()
         }
@@ -143,7 +148,60 @@ class AppViewModel @Inject constructor(
             }
         } catch (e: Exception) {
             Log.w(TAG, "⚠️ Error registering remote on first launch: ${e.message}")
+     
+
+    /**
+     * Start periodic health heartbeat every 30 seconds
+     * Sends real device metrics to backend
+     */
+    private fun startPeriodicHealthHeartbeat() = viewModelScope.launch {
+        val registrationService = DeviceRegistrationService(
+            context = null!!, // Will be injected properly
+            baseUrl = BuildConfig.WEBVIEW_BASEURL
+        )
+        
+        while (true) {
+            try {
+                val token = preference.get(AppConstant.REMOTE_TOKEN, null)
+                
+                if (!token.isNullOrBlank()) {
+                    // Get all health metrics
+                    val metrics = deviceHealthMonitor.getAllMetrics()
+                    
+                    // Get current URL from preference
+                    val currentUrl = preference.get(AppConstant.TOKEN, null)?.let { displayToken ->
+                        "${BuildConfig.WEBVIEW_BASEURL}/display/$displayToken"
+                    }
+                    
+                    // Send heartbeat with full metrics
+                    val result = registrationService.sendHeartbeat(
+                        token = token,
+                        batteryLevel = metrics.batteryLevel,
+                        wifiStrength = metrics.wifiStrength,
+                        screenOn = metrics.screenOn,
+                        storageAvailableMB = metrics.storageAvailableMB,
+                        storageTotalMB = metrics.storageTotalMB,
+                        ramUsageMB = metrics.ramUsageMB,
+                        ramTotalMB = metrics.ramTotalMB,
+                        cpuTemp = metrics.cpuTemp,
+                        networkType = metrics.networkType,
+                        currentUrl = currentUrl
+                    )
+                    
+                    if (result.isSuccess) {
+                        Log.v(TAG, "Heartbeat sent: ${metrics}")
+                    } else {
+                        Log.w(TAG, "Heartbeat failed: ${result.exceptionOrNull()?.message}")
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error sending health heartbeat", e)
+            }
+            
+            // Wait 30 seconds before next heartbeat
+            delay(30_000L)
         }
+    }   }
     }
 
     /**

@@ -63,7 +63,15 @@ class DeviceRegistrationService(
     data class HeartbeatRequest(
         val status: String = "online",
         val battery_level: Int? = null,
-        val wifi_strength: Int? = null
+        val wifi_strength: Int? = null,
+        val screen_on: Boolean? = null,
+        val storage_available_mb: Long? = null,
+        val storage_total_mb: Long? = null,
+        val ram_usage_mb: Int? = null,
+        val ram_total_mb: Int? = null,
+        val cpu_temp: Float? = null,
+        val network_type: String? = null,
+        val current_url: String? = null
     )
 
     @Serializable
@@ -123,18 +131,34 @@ class DeviceRegistrationService(
 
     /**
      * Send heartbeat to CMS to maintain online status
-     * Should be called every 30 seconds
+     * Should be called every 30 seconds with full device health metrics
      */
     suspend fun sendHeartbeat(
         token: String,
         batteryLevel: Int? = null,
-        wifiStrength: Int? = null
+        wifiStrength: Int? = null,
+        screenOn: Boolean? = null,
+        storageAvailableMB: Long? = null,
+        storageTotalMB: Long? = null,
+        ramUsageMB: Int? = null,
+        ramTotalMB: Int? = null,
+        cpuTemp: Float? = null,
+        networkType: String? = null,
+        currentUrl: String? = null
     ): Result<HeartbeatData> {
         return try {
             val request = HeartbeatRequest(
                 status = "online",
                 battery_level = batteryLevel,
-                wifi_strength = wifiStrength
+                wifi_strength = wifiStrength,
+                screen_on = screenOn,
+                storage_available_mb = storageAvailableMB,
+                storage_total_mb = storageTotalMB,
+                ram_usage_mb = ramUsageMB,
+                ram_total_mb = ramTotalMB,
+                cpu_temp = cpuTemp,
+                network_type = networkType,
+                current_url = currentUrl
             )
 
             val response: HttpResponse = client.post("$baseUrl/api/devices/heartbeat") {
