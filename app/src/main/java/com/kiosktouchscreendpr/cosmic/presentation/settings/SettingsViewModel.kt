@@ -174,7 +174,7 @@ class SettingsViewModel @Inject constructor(
             val baseUrl = BuildConfig.WEBVIEW_BASEURL
             val response = deviceApi.getDisplays(baseUrl, perPage = 50)
             val tokens = response?.data
-                ?.mapNotNull { it.name }
+                ?.mapNotNull { it.name }  // ✅ Pakai NAME - Backend support name lookup
                 ?.distinct()
                 ?.sorted()
                 ?: emptyList()
