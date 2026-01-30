@@ -92,14 +92,16 @@ class HomeViewModel @Inject constructor(
     
     /**
      * Periodic check untuk schedule changes setiap 1 menit
-     * Jika admin assign schedule di CMS, WebView akan auto-reload
+     * DISABLED - Tidak perlu auto-refresh di display screen
+     * User bisa manual refresh dengan 5 taps atau WebSocket trigger
      */
     fun startPeriodicRefresh(reload: () -> Unit) = viewModelScope.launch {
-        while (true) {
-            delay(60_000L) // 1 menit
-            println("⏰ Periodic refresh check...")
-            reload()
-        }
+        // Disabled - tidak ada auto-refresh
+        // while (true) {
+        //     delay(60_000L) // 1 menit
+        //     println("⏰ Periodic refresh check...")
+        //     reload()
+        // }
     }
 
     fun onUrlChanged(currentUrl: String) {

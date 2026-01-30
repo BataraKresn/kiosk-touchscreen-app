@@ -165,7 +165,7 @@ class SettingsViewModel @Inject constructor(
             powerOnTime = parseTime(powerOn ?: "")
         )
 
-        fetchTokensFromCms()
+        // Jangan auto-fetch CMS di sini, hanya fetch ketika user click button
     }
 
     private fun fetchTokensFromCms() = viewModelScope.launch {
