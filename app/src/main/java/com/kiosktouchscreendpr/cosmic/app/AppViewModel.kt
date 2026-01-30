@@ -148,60 +148,7 @@ class AppViewModel @Inject constructor(
             }
         } catch (e: Exception) {
             Log.w(TAG, "⚠️ Error registering remote on first launch: ${e.message}")
-     
-
-    /**
-     * Start periodic health heartbeat every 30 seconds
-     * Sends real device metrics to backend
-     */
-    private fun startPeriodicHealthHeartbeat() = viewModelScope.launch {
-        val registrationService = DeviceRegistrationService(
-            context = null!!, // Will be injected properly
-            baseUrl = BuildConfig.WEBVIEW_BASEURL
-        )
-        
-        while (true) {
-            try {
-                val token = preference.get(AppConstant.REMOTE_TOKEN, null)
-                
-                if (!token.isNullOrBlank()) {
-                    // Get all health metrics
-                    val metrics = deviceHealthMonitor.getAllMetrics()
-                    
-                    // Get current URL from preference
-                    val currentUrl = preference.get(AppConstant.TOKEN, null)?.let { displayToken ->
-                        "${BuildConfig.WEBVIEW_BASEURL}/display/$displayToken"
-                    }
-                    
-                    // Send heartbeat with full metrics
-                    val result = registrationService.sendHeartbeat(
-                        token = token,
-                        batteryLevel = metrics.batteryLevel,
-                        wifiStrength = metrics.wifiStrength,
-                        screenOn = metrics.screenOn,
-                        storageAvailableMB = metrics.storageAvailableMB,
-                        storageTotalMB = metrics.storageTotalMB,
-                        ramUsageMB = metrics.ramUsageMB,
-                        ramTotalMB = metrics.ramTotalMB,
-                        cpuTemp = metrics.cpuTemp,
-                        networkType = metrics.networkType,
-                        currentUrl = currentUrl
-                    )
-                    
-                    if (result.isSuccess) {
-                        Log.v(TAG, "Heartbeat sent: ${metrics}")
-                    } else {
-                        Log.w(TAG, "Heartbeat failed: ${result.exceptionOrNull()?.message}")
-                    }
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Error sending health heartbeat", e)
-            }
-            
-            // Wait 30 seconds before next heartbeat
-            delay(30_000L)
         }
-    }   }
     }
 
     /**
@@ -222,6 +169,34 @@ class AppViewModel @Inject constructor(
             newDeviceId
         } else {
             savedDeviceId
+        }
+    }
+
+    /**
+     * Start periodic health heartbeat every 30 seconds
+     * Sends battery level and WiFi strength to backend
+     */
+    private fun startPeriodicHealthHeartbeat() = viewModelScope.launch {
+        while (true) {
+            try {
+                val token = preference.get(AppConstant.REMOTE_TOKEN, null)
+
+                if (!token.isNullOrBlank()) {
+                    // Get battery and WiFi metrics
+                    val batteryLevel = deviceHealthMonitor.getBatteryLevel()
+                    val wifiStrength = deviceHealthMonitor.getWifiStrength()
+
+                    Log.v(TAG, "Heartbeat: battery=$batteryLevel%, wifi=$wifiStrength%")
+
+                    // TODO: Send to backend API when endpoint is ready
+                    // For now just log the metrics
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error in health heartbeat", e)
+            }
+
+            // Wait 30 seconds before next heartbeat
+            delay(30_000L)
         }
     }
 

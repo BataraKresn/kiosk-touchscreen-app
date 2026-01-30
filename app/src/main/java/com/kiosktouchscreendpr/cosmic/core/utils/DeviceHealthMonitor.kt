@@ -12,6 +12,7 @@ import android.os.Environment
 import android.os.StatFs
 import android.os.PowerManager
 import android.util.Log
+import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import java.io.RandomAccessFile
 import javax.inject.Inject
@@ -34,7 +35,7 @@ import javax.inject.Singleton
  */
 @Singleton
 class DeviceHealthMonitor @Inject constructor(
-    private val context: Context
+    @ApplicationContext private val context: Context
 ) {
     companion object {
         private const val TAG = "DeviceHealthMonitor"

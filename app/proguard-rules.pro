@@ -19,3 +19,34 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# Kotlinx Coroutines - Ignore Swing dispatcher for Android
+-dontwarn kotlinx.coroutines.swing.**
+-dontwarn javax.swing.**
+
+# Ktor
+-dontwarn io.ktor.**
+-keep class io.ktor.** { *; }
+-keepclassmembers class io.ktor.** { *; }
+
+# Kotlinx Serialization
+-keepattributes *Annotation*, InnerClasses
+-dontnote kotlinx.serialization.AnnotationsKt
+-keepclassmembers class kotlinx.serialization.json.** {
+    *** Companion;
+}
+-keepclasseswithmembers class kotlinx.serialization.json.** {
+    kotlinx.serialization.KSerializer serializer(...);
+}
+-keep,includedescriptorclasses class com.kiosktouchscreendpr.cosmic.**$$serializer { *; }
+-keepclassmembers class com.kiosktouchscreendpr.cosmic.** {
+    *** Companion;
+}
+-keepclasseswithmembers class com.kiosktouchscreendpr.cosmic.** {
+    kotlinx.serialization.KSerializer serializer(...);
+}
+
+# Keep data classes used for API
+-keep class com.kiosktouchscreendpr.cosmic.data.** { *; }
+-keep class com.kiosktouchscreendpr.cosmic.domain.** { *; }
+

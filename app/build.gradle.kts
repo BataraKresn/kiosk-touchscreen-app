@@ -41,10 +41,30 @@ android {
         buildConfig = true
     }
 
+    signingConfigs {
+        create("release") {
+            // Using debug keystore for simplicity - in production use proper keystore
+            val debugKeystorePath = "${System.getProperty("user.home")}/.android/debug.keystore"
+            storeFile = file(debugKeystorePath)
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+            // Enable both v1 and v2 signing for better compatibility
+            enableV1Signing = true
+            enableV2Signing = true
+            enableV3Signing = true
+            enableV4Signing = false
+        }
+    }
+
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("release")
+        }
         release {
-            isMinifyEnabled = true
+            isMinifyEnabled = false
             isDebuggable = false
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
