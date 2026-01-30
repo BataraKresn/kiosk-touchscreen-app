@@ -79,6 +79,8 @@ Thumbs.db
 
 # Logs
 *.log
+build-output.log
+build-output*.log
 
 # Kotlin
 *.kt.swp
