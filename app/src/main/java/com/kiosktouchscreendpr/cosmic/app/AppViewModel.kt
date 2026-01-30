@@ -1,5 +1,6 @@
 package com.kiosktouchscreendpr.cosmic.app
 
+import android.content.Context
 import android.os.Build
 import android.util.Log
 import androidx.lifecycle.ViewModel
@@ -17,6 +18,7 @@ import com.kiosktouchscreendpr.cosmic.data.api.DeviceRegistrationService
 import com.kiosktouchscreendpr.cosmic.data.datasource.heartbeat.Message
 import com.kiosktouchscreendpr.cosmic.domain.usecase.WebSocketUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -34,6 +36,7 @@ import javax.inject.Inject
 
 @HiltViewModel
 class AppViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val preference: Preference,
     private val heartBeat: WebSocketUseCase,
     private val connectivityObserver: ConnectivityObserver,
@@ -174,25 +177,50 @@ class AppViewModel @Inject constructor(
 
     /**
      * Start periodic health heartbeat every 30 seconds
-     * Sends battery level and WiFi strength to backend
+     * Sends real device metrics to backend
      */
     private fun startPeriodicHealthHeartbeat() = viewModelScope.launch {
+        val registrationService = DeviceRegistrationService(
+            context = context,
+            baseUrl = BuildConfig.WEBVIEW_BASEURL
+        )
+        
         while (true) {
             try {
                 val token = preference.get(AppConstant.REMOTE_TOKEN, null)
 
                 if (!token.isNullOrBlank()) {
-                    // Get battery and WiFi metrics
-                    val batteryLevel = deviceHealthMonitor.getBatteryLevel()
-                    val wifiStrength = deviceHealthMonitor.getWifiStrength()
-
-                    Log.v(TAG, "Heartbeat: battery=$batteryLevel%, wifi=$wifiStrength%")
-
-                    // TODO: Send to backend API when endpoint is ready
-                    // For now just log the metrics
+                    // Get all health metrics
+                    val metrics = deviceHealthMonitor.getAllMetrics()
+                    
+                    // Get current URL from preference
+                    val currentUrl = preference.get(AppConstant.TOKEN, null)?.let { displayToken ->
+                        "${BuildConfig.WEBVIEW_BASEURL}/display/$displayToken"
+                    }
+                    
+                    // Send heartbeat with full metrics
+                    val result = registrationService.sendHeartbeat(
+                        token = token,
+                        batteryLevel = metrics.batteryLevel,
+                        wifiStrength = metrics.wifiStrength,
+                        screenOn = metrics.screenOn,
+                        storageAvailableMB = metrics.storageAvailableMB,
+                        storageTotalMB = metrics.storageTotalMB,
+                        ramUsageMB = metrics.ramUsageMB,
+                        ramTotalMB = metrics.ramTotalMB,
+                        cpuTemp = metrics.cpuTemp,
+                        networkType = metrics.networkType,
+                        currentUrl = currentUrl
+                    )
+                    
+                    if (result.isSuccess) {
+                        Log.v(TAG, "✅ Heartbeat sent: ${metrics}")
+                    } else {
+                        Log.w(TAG, "⚠️ Heartbeat failed: ${result.exceptionOrNull()?.message}")
+                    }
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Error in health heartbeat", e)
+                Log.e(TAG, "❌ Error in health heartbeat", e)
             }
 
             // Wait 30 seconds before next heartbeat
