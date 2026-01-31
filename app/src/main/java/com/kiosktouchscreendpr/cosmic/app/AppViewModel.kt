@@ -15,6 +15,7 @@ import com.kiosktouchscreendpr.cosmic.core.utils.formatLink
 import com.kiosktouchscreendpr.cosmic.core.utils.getDeviceIP
 import com.kiosktouchscreendpr.cosmic.data.api.DeviceApi
 import com.kiosktouchscreendpr.cosmic.data.api.DeviceRegistrationService
+import com.kiosktouchscreendpr.cosmic.data.cache.ResponseCache
 import com.kiosktouchscreendpr.cosmic.data.datasource.heartbeat.Message
 import com.kiosktouchscreendpr.cosmic.domain.usecase.WebSocketUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -41,7 +42,8 @@ class AppViewModel @Inject constructor(
     private val heartBeat: WebSocketUseCase,
     private val connectivityObserver: ConnectivityObserver,
     private val deviceApi: DeviceApi,
-    private val deviceHealthMonitor: DeviceHealthMonitor
+    private val deviceHealthMonitor: DeviceHealthMonitor,
+    private val responseCache: ResponseCache
 ) : ViewModel() {
 
     private val ipAddress: String? = getDeviceIP()
@@ -182,7 +184,8 @@ class AppViewModel @Inject constructor(
     private fun startPeriodicHealthHeartbeat() = viewModelScope.launch {
         val registrationService = DeviceRegistrationService(
             context = context,
-            baseUrl = BuildConfig.WEBVIEW_BASEURL
+            baseUrl = BuildConfig.WEBVIEW_BASEURL,
+            responseCache = responseCache
         )
         
         while (true) {

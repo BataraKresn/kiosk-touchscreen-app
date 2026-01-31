@@ -14,13 +14,15 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import android.util.Log
 import kotlinx.coroutines.delay
+import com.kiosktouchscreendpr.cosmic.data.cache.ResponseCache
 
 /**
  * Service for device registration and heartbeat with CMS
  */
 class DeviceRegistrationService(
     private val context: Context,
-    private val baseUrl: String // e.g., "https://kiosk.mugshot.dev"
+    private val baseUrl: String, // e.g., "https://kiosk.mugshot.dev"
+    private val responseCache: ResponseCache? = null
 ) {
     private val tag = "DeviceRegistration"
     
@@ -177,6 +179,9 @@ class DeviceRegistrationService(
             if (response.status == HttpStatusCode.OK) {
                 val body = response.body<HeartbeatResponse>()
                 if (body.success && body.data != null) {
+                    // Cache response to reduce network load
+                    responseCache?.cacheHeartbeatResponse(body.data.remote_control_enabled)
+                    
                     Log.d(tag, "Heartbeat sent. Remote control: ${body.data.remote_control_enabled}")
                     Result.success(body.data)
                 } else {

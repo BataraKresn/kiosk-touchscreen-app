@@ -231,10 +231,9 @@ fun HomeView(
                         useWideViewPort = true
                         loadWithOverviewMode = true
                         
-                        // Enable caching for better performance
+                        // Enable caching for better performance (AppCache deprecated, using default cache)
                         cacheMode = android.webkit.WebSettings.LOAD_DEFAULT
-                        setAppCacheEnabled(true)
-                        setAppCachePath(context.cacheDir.path)
+                        databaseEnabled = true
                     }
 
                     loadUrl(state.baseUrl)
