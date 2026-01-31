@@ -31,6 +31,13 @@ class DeviceRegistrationService(
                 isLenient = true
             })
         }
+        
+        // Add timeout to prevent hanging requests
+        install(io.ktor.client.plugins.HttpTimeout) {
+            requestTimeoutMillis = 15000
+            connectTimeoutMillis = 10000
+            socketTimeoutMillis = 15000
+        }
     }
 
     @Serializable

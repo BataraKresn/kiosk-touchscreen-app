@@ -156,7 +156,7 @@ fun HomeView(
                     webViewClient = object : WebViewClient() {
                         override fun onPageStarted(view: WebView, url: String, favicon: Bitmap?) {
                             super.onPageStarted(view, url, favicon)
-                            Log.d("Home", "onPageStarted: $url")
+                            // Log.d("Home", "onPageStarted: $url") // Disabled for performance
                             currentUrl = url
                             onUrlChanged(url)
                             onUserInteraction()
@@ -166,7 +166,7 @@ fun HomeView(
                             view: WebView, url: String
                         ) {
                             super.onPageFinished(view, url)
-                            Log.d("Home", "onPageFinished: $url")
+                            // Log.d("Home", "onPageFinished: $url") // Disabled for performance
                             if (url == baseUrl) {
                                 onEvent(HomeEvent.OnInitialUrl(true))
                             }
@@ -200,13 +200,13 @@ fun HomeView(
                         ) {
                             super.onProgressChanged(view, newProgress)
                             progress = newProgress
-                            Log.d("Home", "onProgressChanged: $progress")
+                            // Log.d("Home", "onProgressChanged: $progress") // Disabled for performance
                         }
 
                         override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
-                            consoleMessage?.let {
-                                Log.d("WebViewConsole", "[${it.messageLevel()}] ${it.message()} -- From line ${it.lineNumber()} of ${it.sourceId()}")
-                            }
+                            // consoleMessage?.let {
+                            //     Log.d("WebViewConsole", "[${it.messageLevel()}] ${it.message()} -- From line ${it.lineNumber()} of ${it.sourceId()}")
+                            // }
                             return true
                         }
                     }
@@ -230,13 +230,19 @@ fun HomeView(
                         mediaPlaybackRequiresUserGesture = false
                         useWideViewPort = true
                         loadWithOverviewMode = true
+                        
+                        // Enable caching for better performance
+                        cacheMode = android.webkit.WebSettings.LOAD_DEFAULT
+                        setAppCacheEnabled(true)
+                        setAppCachePath(context.cacheDir.path)
                     }
 
                     loadUrl(state.baseUrl)
                 }
             },
             update = {
-                if (state.baseUrl.isNotEmpty()) {
+                // Only reload if URL actually changed to prevent unnecessary reloads
+                if (state.baseUrl.isNotEmpty() && it.url != state.baseUrl) {
                     it.loadUrl(state.baseUrl)
                 }
             }

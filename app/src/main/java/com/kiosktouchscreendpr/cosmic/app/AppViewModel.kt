@@ -213,14 +213,15 @@ class AppViewModel @Inject constructor(
                         currentUrl = currentUrl
                     )
                     
-                    if (result.isSuccess) {
-                        Log.v(TAG, "✅ Heartbeat sent: ${metrics}")
-                    } else {
-                        Log.w(TAG, "⚠️ Heartbeat failed: ${result.exceptionOrNull()?.message}")
-                    }
+                    // Disabled for production performance
+                    // if (result.isSuccess) {
+                    //     Log.v(TAG, "✅ Heartbeat sent: ${metrics}")
+                    // } else {
+                    //     Log.w(TAG, "⚠️ Heartbeat failed: ${result.exceptionOrNull()?.message}")
+                    // }
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "❌ Error in health heartbeat", e)
+                // Log.e(TAG, "❌ Error in health heartbeat", e) // Disabled for performance
             }
 
             // Wait 30 seconds before next heartbeat
