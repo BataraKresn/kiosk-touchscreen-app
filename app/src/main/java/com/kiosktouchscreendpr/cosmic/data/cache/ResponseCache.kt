@@ -2,8 +2,6 @@ package com.kiosktouchscreendpr.cosmic.data.cache
 
 import android.content.Context
 import android.content.SharedPreferences
-import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -20,7 +18,6 @@ class ResponseCache @Inject constructor(
         "response_cache",
         Context.MODE_PRIVATE
     )
-    private val gson = Gson()
 
     companion object {
         private const val CACHE_EXPIRY_MS = 60_000L // 1 minute
@@ -47,35 +44,6 @@ class ResponseCache @Inject constructor(
             prefs.getBoolean("remote_control_enabled", false)
         } else {
             null // Cache expired
-        }
-    }
-
-    /**
-     * Cache device metrics untuk prevent duplicate reads
-     */
-    fun cacheDeviceMetrics(metrics: Map<String, Any>) {
-        val json = gson.toJson(metrics)
-        prefs.edit()
-            .putString("device_metrics", json)
-            .putLong("device_metrics_time", System.currentTimeMillis())
-            .apply()
-    }
-
-    /**
-     * Get cached metrics jika masih valid (< 30 detik)
-     */
-    fun getCachedDeviceMetrics(): Map<String, Any>? {
-        val timestamp = prefs.getLong("device_metrics_time", 0)
-        val age = System.currentTimeMillis() - timestamp
-        
-        return if (age < 30_000L) { // 30 seconds
-            val json = prefs.getString("device_metrics", null)
-            if (json != null) {
-                val type = object : TypeToken<Map<String, Any>>() {}.type
-                gson.fromJson(json, type)
-            } else null
-        } else {
-            null
         }
     }
 
