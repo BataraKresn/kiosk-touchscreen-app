@@ -80,13 +80,15 @@ class DeviceHealthMonitor @Inject constructor(
     fun getWifiStrength(): Int? {
         return try {
             // Use WifiManager for all Android versions - it provides accurate RSSI
+            val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as? android.net.wifi.WifiManager
+                ?: return null
+            
             @Suppress("DEPRECATION")
-            val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as android.net.wifi.WifiManager
-            @Suppress("DEPRECATION")
-            val wifiInfo = wifiManager.connectionInfo
+            val wifiInfo = wifiManager.connectionInfo ?: return null
             
             // Verify we're actually connected to WiFi
-            val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+            val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+                ?: return null
             val network = connectivityManager.activeNetwork ?: return null
             val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return null
             
@@ -103,7 +105,6 @@ class DeviceHealthMonitor @Inject constructor(
             
             return rssi
         } catch (e: Exception) {
-            Log.w(TAG, "Failed to get WiFi strength", e)
             null
         }
     }

@@ -145,8 +145,6 @@ class ConnectionManager @Inject constructor(
                     ProcessState.BACKGROUND
                 }
                 
-                Log.d(TAG, "Process state: ${_processState.value}")
-                
                 // Adjust heartbeat when process state changes
                 if (heartbeatJob?.isActive == true) {
                     restartHeartbeatWithCurrentSettings()
