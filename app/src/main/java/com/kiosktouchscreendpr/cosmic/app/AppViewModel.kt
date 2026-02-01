@@ -199,8 +199,11 @@ class AppViewModel @Inject constructor(
      * Register device or resume heartbeat if already registered
      */
     private fun registerOrResumeDevice() = viewModelScope.launch {
+        Log.i(TAG, "🔵 registerOrResumeDevice: Starting device registration or resume")
+        
         val existingToken = preference.get(AppConstant.REMOTE_TOKEN, null)
         if (!existingToken.isNullOrBlank()) {
+            Log.i(TAG, "✅ registerOrResumeDevice: Found existing token: ${existingToken.take(8)}...")
             // Try to resume with existing token
             connectionManager.connect(existingToken)
             
@@ -209,6 +212,7 @@ class AppViewModel @Inject constructor(
             return@launch
         }
         
+        Log.w(TAG, "⚠️ registerOrResumeDevice: No existing token, starting first-time registration")
         // Not registered yet, do registration
         registerDeviceOnFirstLaunch()
     }
