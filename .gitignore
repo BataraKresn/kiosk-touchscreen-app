@@ -84,6 +84,7 @@ build-output*.log
 
 # Kotlin
 *.kt.swp
+.kotlin/
 
 # Proguard
 proguard/
@@ -100,3 +101,8 @@ lint-results_files/
 # Build outputs
 release/
 debug/
+app/build/
+.kotlinToolingMetadata/
+
+# Documentation (generated)
+doc/CONNECTION_FLAPPING_FIXES.md

@@ -18,6 +18,7 @@ import com.kiosktouchscreendpr.cosmic.core.utils.formatLink
 import com.kiosktouchscreendpr.cosmic.core.utils.getDeviceIP
 import com.kiosktouchscreendpr.cosmic.data.api.DeviceApi
 import com.kiosktouchscreendpr.cosmic.data.api.DeviceRegistrationService
+import com.kiosktouchscreendpr.cosmic.data.api.RegisterRemoteResponse
 import com.kiosktouchscreendpr.cosmic.data.cache.ResponseCache
 import com.kiosktouchscreendpr.cosmic.data.datasource.heartbeat.Message
 import com.kiosktouchscreendpr.cosmic.domain.usecase.WebSocketUseCase
@@ -87,7 +88,7 @@ class AppViewModel @Inject constructor(
      * FIX #1: Delegate all connection logic to ConnectionManager
      * No more direct WebSocket connection from AppViewModel
      */
-    private fun connectWs() = viewModelScope.launch {
+    private fun connectWs(): kotlinx.coroutines.Job = viewModelScope.launch {
         val remoteToken = preference.get(AppConstant.REMOTE_TOKEN, null)
         if (!remoteToken.isNullOrBlank()) {
             connectionManager.connect(remoteToken)
@@ -96,7 +97,7 @@ class AppViewModel @Inject constructor(
         }
     }
 
-    private fun disconnectWs() = viewModelScope.launch {
+    private fun disconnectWs(): kotlinx.coroutines.Job = viewModelScope.launch {
         connectionManager.disconnect("User-initiated disconnect")
     }
 
@@ -104,7 +105,7 @@ class AppViewModel @Inject constructor(
      * FIX #4: Network events are SIGNALS to ConnectionManager
      * NetworkObserver reports stability, ConnectionManager decides action
      */
-    private fun observeNetworkForConnectionManager() = viewModelScope.launch {
+    private fun observeNetworkForConnectionManager(): kotlinx.coroutines.Job = viewModelScope.launch {
         networkObserver.isStable.collect { stable ->
             if (stable) {
                 Log.d(TAG, "🟢 Network stable, notifying ConnectionManager")
@@ -177,7 +178,7 @@ class AppViewModel @Inject constructor(
         }
     }
 
-    private fun observeWsMessages() = viewModelScope.launch {
+    private fun observeWsMessages(): kotlinx.coroutines.Job = viewModelScope.launch {
         heartBeat.observeMessages().collect { message ->
             when (message) {
 
@@ -198,7 +199,7 @@ class AppViewModel @Inject constructor(
     /**
      * Register device or resume heartbeat if already registered
      */
-    private fun registerOrResumeDevice() = viewModelScope.launch {
+    private fun registerOrResumeDevice(): kotlinx.coroutines.Job = viewModelScope.launch {
         Log.i(TAG, "[REGISTER] Starting device registration or resume")
         
         val existingToken = preference.get(AppConstant.REMOTE_TOKEN, null)
@@ -221,7 +222,7 @@ class AppViewModel @Inject constructor(
      * Monitor for authentication errors (deleted device, invalid token)
      * If detected, clear token and re-register
      */
-    private fun monitorAuthErrors() = viewModelScope.launch {
+    private fun monitorAuthErrors(): kotlinx.coroutines.Job = viewModelScope.launch {
         connectionManager.connectionState.collect { state ->
             if (state is ConnectionManager.ConnectionState.Error) {
                 // Check if it's an auth error (401/403)
@@ -249,7 +250,7 @@ class AppViewModel @Inject constructor(
      * 
      * UPDATED: Start heartbeat after successful registration
      */
-    private fun registerDeviceOnFirstLaunch() = viewModelScope.launch {
+    private fun registerDeviceOnFirstLaunch(): kotlinx.coroutines.Job = viewModelScope.launch {
         try {
             val deviceId = getOrCreateDeviceId()
             val baseUrl = BuildConfig.WEBVIEW_BASEURL.takeIf { it.isNotBlank() }
@@ -261,27 +262,38 @@ class AppViewModel @Inject constructor(
             Log.i(TAG, "Registering device: $deviceId with baseUrl: $baseUrl")
             val deviceName = "${Build.MANUFACTURER} ${Build.MODEL}".uppercase()
             
-            val response = deviceApi.registerRemoteDevice(
+            val response: RegisterRemoteResponse? = deviceApi.registerRemoteDevice(
                 baseUrl = baseUrl,
                 deviceId = deviceId,
                 deviceName = deviceName,
                 appVersion = BuildConfig.VERSION_NAME
             )
             
-            if (response != null && response.success) {
-                Log.i(TAG, "Device registered successfully. Remote ID: ${response.data.remoteId}, Token: ${response.data.token.take(10)}...")
-                preference.set(AppConstant.REMOTE_ID, response.data.remoteId.toString())
-                preference.set(AppConstant.REMOTE_TOKEN, response.data.token)
-                
-                // START HEARTBEAT via ConnectionManager
-                Log.i(TAG, "Starting heartbeat after registration")
-                connectionManager.connect(response.data.token)
-                
-                // Monitor for auth errors
-                monitorAuthErrors()
-            } else {
-                Log.w(TAG, "Device registration returned false or null")
+            // Check response explicitly
+            if (response == null) {
+                Log.w(TAG, "Device registration returned null response")
+                return@launch
             }
+            
+            if (!response.success) {
+                Log.w(TAG, "Device registration returned success=false")
+                return@launch
+            }
+            
+            // Extract data with explicit types
+            val remoteId: Int = response.data.remoteId
+            val token: String = response.data.token
+            
+            Log.i(TAG, "Device registered successfully. Remote ID: $remoteId, Token: ${token.take(10)}...")
+            preference.set(AppConstant.REMOTE_ID, remoteId.toString())
+            preference.set(AppConstant.REMOTE_TOKEN, token)
+            
+            // START HEARTBEAT via ConnectionManager
+            Log.i(TAG, "Starting heartbeat after registration")
+            connectionManager.connect(token)
+            
+            // Monitor for auth errors
+            monitorAuthErrors()
         } catch (e: Exception) {
             Log.e(TAG, "Device registration failed", e)
         }
@@ -293,7 +305,7 @@ class AppViewModel @Inject constructor(
      */
     private fun getOrCreateDeviceId(): String {
         // Use Android ID - persistent across app uninstall/reinstall
-        val androidId = Settings.Secure.getString(context.contentResolver, Settings.Secure.ANDROID_ID)
+        val androidId: String? = Settings.Secure.getString(context.contentResolver, Settings.Secure.ANDROID_ID)
         return androidId?.takeIf { it.isNotBlank() }
             ?: "device-${Build.MODEL.replace(" ", "-")}".lowercase()
     }
