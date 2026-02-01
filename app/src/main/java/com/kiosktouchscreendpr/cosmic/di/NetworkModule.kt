@@ -1,10 +1,13 @@
 package com.kiosktouchscreendpr.cosmic.di
 
+import android.content.Context
 import com.kiosktouchscreendpr.cosmic.BuildConfig
 import com.kiosktouchscreendpr.cosmic.data.api.DeviceApi
+import com.kiosktouchscreendpr.cosmic.data.api.DeviceRegistrationService
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
@@ -71,5 +74,18 @@ object NetworkModule {
     @Singleton
     fun provideDeviceApi(client: HttpClient): DeviceApi {
         return DeviceApi(client)
+    }
+    
+    @Provides
+    @Singleton
+    fun provideDeviceRegistrationService(
+        @ApplicationContext context: Context,
+        client: HttpClient
+    ): DeviceRegistrationService {
+        return DeviceRegistrationService(
+            context = context,
+            baseUrl = BuildConfig.WEBVIEW_BASEURL,
+            responseCache = null
+        )
     }
 }

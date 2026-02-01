@@ -7,6 +7,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kiosktouchscreendpr.cosmic.BuildConfig
 import com.kiosktouchscreendpr.cosmic.app.AppState.Status
+import com.kiosktouchscreendpr.cosmic.core.connection.ConnectionManager
+import com.kiosktouchscreendpr.cosmic.core.connection.NetworkObserver
 import com.kiosktouchscreendpr.cosmic.core.constant.AppConstant
 import com.kiosktouchscreendpr.cosmic.core.utils.ConnectivityObserver
 import com.kiosktouchscreendpr.cosmic.core.utils.DeviceHealthMonitor
@@ -33,6 +35,11 @@ import javax.inject.Inject
 /**
  * Code author  : Anugrah Surya Putra.
  * Project      : Cosmic
+ * 
+ * UPDATED: Integrated with ConnectionManager for anti-flapping
+ * - ConnectionManager is now the SINGLE SOURCE OF TRUTH
+ * - Network events are signals, not commands
+ * - All reconnect logic delegated to ConnectionManager
  */
 
 @HiltViewModel
@@ -43,7 +50,9 @@ class AppViewModel @Inject constructor(
     private val connectivityObserver: ConnectivityObserver,
     private val deviceApi: DeviceApi,
     private val deviceHealthMonitor: DeviceHealthMonitor,
-    private val responseCache: ResponseCache
+    private val responseCache: ResponseCache,
+    private val connectionManager: ConnectionManager,
+    private val networkObserver: NetworkObserver
 ) : ViewModel() {
 
     private val ipAddress: String? = getDeviceIP()
@@ -56,8 +65,8 @@ class AppViewModel @Inject constructor(
     val state = _state
         .onStart {
             registerDeviceOnFirstLaunch()
-            startPeriodicHealthHeartbeat()
-            observeNetwork()
+            observeConnectionManager()
+            observeNetworkForConnectionManager()
             observeWsMessages()
         }
         .stateIn(
@@ -73,33 +82,96 @@ class AppViewModel @Inject constructor(
     val token: String?
         get() = preference.get(AppConstant.TOKEN, null)
 
+    /**
+     * FIX #1: Delegate all connection logic to ConnectionManager
+     * No more direct WebSocket connection from AppViewModel
+     */
     private fun connectWs() = viewModelScope.launch {
-        try {
-            heartBeat.connect(wsUrl)
-            _state.update { it.copy(status = Status.CONNECTED, error = null) }
-        } catch (e: Exception) {
-            _state.update {
-                it.copy(
-                    status = Status.DISCONNECTED,
-                    error = e.message ?: "Unknown error"
-                )
-            }
+        val remoteToken = preference.get(AppConstant.REMOTE_TOKEN, null)
+        if (!remoteToken.isNullOrBlank()) {
+            connectionManager.connect(remoteToken)
+        } else {
+            Log.w(TAG, "No remote token available, skipping connection")
         }
     }
 
     private fun disconnectWs() = viewModelScope.launch {
-        heartBeat.disconnect()
-        _state.update { it.copy(status = Status.DISCONNECTED, error = null) }
+        connectionManager.disconnect("User-initiated disconnect")
     }
 
-    private fun observeNetwork() = viewModelScope.launch {
-        connectivityObserver.isConnected.collect { connected ->
-            if (connected) {
-                println("🟢 Network available, trying to connect WebSocket")
-                connectWs()
+    /**
+     * FIX #4: Network events are SIGNALS to ConnectionManager
+     * NetworkObserver reports stability, ConnectionManager decides action
+     */
+    private fun observeNetworkForConnectionManager() = viewModelScope.launch {
+        networkObserver.isStable.collect { stable ->
+            if (stable) {
+                Log.d(TAG, "🟢 Network stable, notifying ConnectionManager")
+                connectionManager.onNetworkAvailable()
+                connectWs() // Initiate connection via manager
             } else {
-                println("🔴 Network lost, disconnecting WebSocket")
-                disconnectWs()
+                Log.d(TAG, "🔴 Network unstable, notifying ConnectionManager")
+                connectionManager.onNetworkLost()
+            }
+        }
+    }
+
+    /**
+     * FIX #1: Observe ConnectionManager state for UI updates
+     */
+    private fun observeConnectionManager() = viewModelScope.launch {
+        connectionManager.connectionState.collect { connState ->
+            when (connState) {
+                is ConnectionManager.ConnectionState.Connected -> {
+                    _state.update { it.copy(status = Status.CONNECTED, error = null) }
+                    Log.i(TAG, "✅ Connected via ConnectionManager")
+                }
+                is ConnectionManager.ConnectionState.Connecting -> {
+                    _state.update { it.copy(status = Status.CONNECTING, error = null) }
+                }
+                is ConnectionManager.ConnectionState.Reconnecting -> {
+                    _state.update { 
+                        it.copy(
+                            status = Status.CONNECTING, 
+                            error = "Reconnecting (attempt ${connState.attempt})..."
+                        ) 
+                    }
+                }
+                is ConnectionManager.ConnectionState.Disconnected -> {
+                    _state.update { it.copy(status = Status.DISCONNECTED, error = null) }
+                }
+                is ConnectionManager.ConnectionState.Error -> {
+                    _state.update { 
+                        it.copy(
+                            status = Status.DISCONNECTED, 
+                            error = connState.message
+                        ) 
+                    }
+                }
+                is ConnectionManager.ConnectionState.ServerBlocked -> {
+                    val until = connState.until
+                    val message = if (until != null) {
+                        "Server blocked reconnect until ${(until - System.currentTimeMillis()) / 1000}s"
+                    } else {
+                        "Server blocked reconnect indefinitely"
+                    }
+                    _state.update { 
+                        it.copy(
+                            status = Status.DISCONNECTED, 
+                            error = message
+                        ) 
+                    }
+                    Log.w(TAG, "⛔ $message")
+                }
+                is ConnectionManager.ConnectionState.CircuitOpen -> {
+                    _state.update { 
+                        it.copy(
+                            status = Status.DISCONNECTED, 
+                            error = "Circuit breaker open (too many failures)"
+                        ) 
+                    }
+                    Log.e(TAG, "🚨 Circuit breaker open")
+                }
             }
         }
     }
@@ -178,59 +250,10 @@ class AppViewModel @Inject constructor(
     }
 
     /**
-     * Start periodic health heartbeat every 30 seconds
-     * Sends real device metrics to backend
+     * NOTE: Health heartbeat is now handled by ConnectionManager
+     * ConnectionManager sends heartbeats with device metrics automatically
+     * This method is kept for backward compatibility but does nothing
      */
-    private fun startPeriodicHealthHeartbeat() = viewModelScope.launch {
-        val registrationService = DeviceRegistrationService(
-            context = context,
-            baseUrl = BuildConfig.WEBVIEW_BASEURL,
-            responseCache = responseCache
-        )
-        
-        while (true) {
-            try {
-                val token = preference.get(AppConstant.REMOTE_TOKEN, null)
-
-                if (!token.isNullOrBlank()) {
-                    // Get all health metrics
-                    val metrics = deviceHealthMonitor.getAllMetrics()
-                    
-                    // Get current URL from preference
-                    val currentUrl = preference.get(AppConstant.TOKEN, null)?.let { displayToken ->
-                        "${BuildConfig.WEBVIEW_BASEURL}/display/$displayToken"
-                    }
-                    
-                    // Send heartbeat with full metrics
-                    val result = registrationService.sendHeartbeat(
-                        token = token,
-                        batteryLevel = metrics.batteryLevel,
-                        wifiStrength = metrics.wifiStrength,
-                        screenOn = metrics.screenOn,
-                        storageAvailableMB = metrics.storageAvailableMB,
-                        storageTotalMB = metrics.storageTotalMB,
-                        ramUsageMB = metrics.ramUsageMB,
-                        ramTotalMB = metrics.ramTotalMB,
-                        cpuTemp = metrics.cpuTemp,
-                        networkType = metrics.networkType,
-                        currentUrl = currentUrl
-                    )
-                    
-                    // Disabled for production performance
-                    // if (result.isSuccess) {
-                    //     Log.v(TAG, "✅ Heartbeat sent: ${metrics}")
-                    // } else {
-                    //     Log.w(TAG, "⚠️ Heartbeat failed: ${result.exceptionOrNull()?.message}")
-                    // }
-                }
-            } catch (e: Exception) {
-                // Log.e(TAG, "❌ Error in health heartbeat", e) // Disabled for performance
-            }
-
-            // Wait 30 seconds before next heartbeat
-            delay(30_000L)
-        }
-    }
 
     companion object {
         private const val TAG = "AppViewModel"
