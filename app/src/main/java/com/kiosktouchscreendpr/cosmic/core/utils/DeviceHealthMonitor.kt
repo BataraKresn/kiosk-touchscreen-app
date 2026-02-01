@@ -98,7 +98,6 @@ class DeviceHealthMonitor @Inject constructor(
             // RSSI should be between -100 and 0, with -30 being excellent
             // If RSSI is invalid (e.g., -127 or 0), return null
             if (rssi == -127 || rssi == 0 || rssi < -100 || rssi > 0) {
-                Log.w(TAG, "Invalid WiFi RSSI: $rssi")
                 return null
             }
             

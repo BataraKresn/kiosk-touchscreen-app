@@ -189,13 +189,11 @@ class ConnectionManager @Inject constructor(
         networkDebounceJob = managerScope.launch {
             delay(NETWORK_STABILITY_WINDOW_MS)
             _networkStable.value = true
-            Log.d(TAG, "Network stable after debounce window")
             
             // Network stability is a SIGNAL, not a command
             // If we have a token but not connected, try to connect now
             // Only start if heartbeat not already running
             if (deviceToken != null && _connectionState.value !is ConnectionState.Connected && heartbeatJob?.isActive != true) {
-                Log.i(TAG, "Network stable and have token, attempting connection")
                 startHeartbeat()
             } else if (_connectionState.value is ConnectionState.Disconnected ||
                 _connectionState.value is ConnectionState.Error) {
@@ -222,7 +220,6 @@ class ConnectionManager @Inject constructor(
         reconnectAttempt = 0
         
         if (_connectionState.value is ConnectionState.Connected) {
-            Log.d(TAG, "Already connected")
             return
         }
 
@@ -252,13 +249,10 @@ class ConnectionManager @Inject constructor(
     private fun startHeartbeat() {
         // Guard: Don't start if already running
         if (heartbeatJob?.isActive == true) {
-            Log.d(TAG, "Heartbeat already running, skipping start")
             return
         }
         
         stopHeartbeat()
-        
-        Log.i(TAG, "Starting heartbeat with token: ${deviceToken?.take(8)}...")
         
         heartbeatJob = managerScope.launch {
             while (isActive && deviceToken != null) {
@@ -278,7 +272,6 @@ class ConnectionManager @Inject constructor(
                     }
                     
                 } catch (e: CancellationException) {
-                    Log.d(TAG, "Heartbeat cancelled")
                     break
                 } catch (e: Exception) {
                     Log.e(TAG, "Heartbeat error", e)
