@@ -192,8 +192,12 @@ class ConnectionManager @Inject constructor(
             Log.d(TAG, "Network stable after debounce window")
             
             // Network stability is a SIGNAL, not a command
-            // Only trigger reconnect if we're in a valid state
-            if (_connectionState.value is ConnectionState.Disconnected ||
+            // If we have a token but not connected, try to connect now
+            // Only start if heartbeat not already running
+            if (deviceToken != null && _connectionState.value !is ConnectionState.Connected && heartbeatJob?.isActive != true) {
+                Log.i(TAG, "Network stable and have token, attempting connection")
+                startHeartbeat()
+            } else if (_connectionState.value is ConnectionState.Disconnected ||
                 _connectionState.value is ConnectionState.Error) {
                 considerReconnect("Network became stable")
             }
@@ -213,6 +217,10 @@ class ConnectionManager @Inject constructor(
      * Primary connect entry point
      */
     fun connect(token: String) {
+        // Save token FIRST before any checks
+        deviceToken = token
+        reconnectAttempt = 0
+        
         if (_connectionState.value is ConnectionState.Connected) {
             Log.d(TAG, "Already connected")
             return
@@ -228,12 +236,9 @@ class ConnectionManager @Inject constructor(
         }
 
         if (!_networkStable.value) {
-            Log.w(TAG, "Network not stable, deferring connection")
+            Log.w(TAG, "Network not stable, deferring connection (token saved)")
             return
         }
-
-        deviceToken = token
-        reconnectAttempt = 0
         
         _connectionState.value = ConnectionState.Connecting
         startHeartbeat()
@@ -245,14 +250,20 @@ class ConnectionManager @Inject constructor(
      * WebSocket heartbeat (if any) is for transport health only.
      */
     private fun startHeartbeat() {
+        // Guard: Don't start if already running
+        if (heartbeatJob?.isActive == true) {
+            Log.d(TAG, "Heartbeat already running, skipping start")
+            return
+        }
+        
         stopHeartbeat()
+        
+        Log.i(TAG, "Starting heartbeat with token: ${deviceToken?.take(8)}...")
         
         heartbeatJob = managerScope.launch {
             while (isActive && deviceToken != null) {
                 val interval = getCurrentHeartbeatInterval()
                 val timeout = getCurrentHeartbeatTimeout()
-                
-                delay(interval)
                 
                 try {
                     val result = sendHeartbeatToCMS()
@@ -273,6 +284,9 @@ class ConnectionManager @Inject constructor(
                     Log.e(TAG, "Heartbeat error", e)
                     handleFailedHeartbeat(e, timeout)
                 }
+                
+                // Delay after sending, not before, so first heartbeat is immediate
+                delay(interval)
             }
         }
     }

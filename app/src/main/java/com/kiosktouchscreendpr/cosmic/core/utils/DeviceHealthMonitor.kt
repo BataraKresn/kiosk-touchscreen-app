@@ -79,29 +79,30 @@ class DeviceHealthMonitor @Inject constructor(
      */
     fun getWifiStrength(): Int? {
         return try {
-            val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+            // Use WifiManager for all Android versions - it provides accurate RSSI
+            @Suppress("DEPRECATION")
+            val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as android.net.wifi.WifiManager
+            @Suppress("DEPRECATION")
+            val wifiInfo = wifiManager.connectionInfo
             
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                val network = connectivityManager.activeNetwork ?: return null
-                val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return null
-                
-                if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
-                    // For Android 10+, signal strength is in NetworkCapabilities
-                    val signalStrength = capabilities.signalStrength
-                    // Convert to dBm approximation (-100 to -30)
-                    val dbm = (signalStrength * 0.7 - 100).toInt()
-                    return dbm.coerceIn(-100, -30)
-                }
-            } else {
-                // For older Android versions
-                @Suppress("DEPRECATION")
-                val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as android.net.wifi.WifiManager
-                @Suppress("DEPRECATION")
-                val wifiInfo = wifiManager.connectionInfo
-                return wifiInfo.rssi // Already in dBm
+            // Verify we're actually connected to WiFi
+            val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+            val network = connectivityManager.activeNetwork ?: return null
+            val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return null
+            
+            if (!capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
+                return null // Not on WiFi
             }
             
-            null
+            val rssi = wifiInfo.rssi
+            // RSSI should be between -100 and 0, with -30 being excellent
+            // If RSSI is invalid (e.g., -127 or 0), return null
+            if (rssi == -127 || rssi == 0 || rssi < -100 || rssi > 0) {
+                Log.w(TAG, "Invalid WiFi RSSI: $rssi")
+                return null
+            }
+            
+            return rssi
         } catch (e: Exception) {
             Log.w(TAG, "Failed to get WiFi strength", e)
             null
