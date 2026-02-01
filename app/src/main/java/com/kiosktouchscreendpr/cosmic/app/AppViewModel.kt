@@ -234,8 +234,8 @@ class AppViewModel @Inject constructor(
         val savedDeviceId = preference.get(AppConstant.DEVICE_ID, null)
         
         return if (savedDeviceId.isNullOrBlank()) {
-            val newDeviceId = Build.SERIAL.takeIf { it != "unknown" }
-                ?: UUID.randomUUID().toString().take(12)
+            // Generate unique device ID (UUID-based untuk menghindari Build.SERIAL yang deprecated)
+            val newDeviceId = UUID.randomUUID().toString().take(16)
             
             preference.set(AppConstant.DEVICE_ID, newDeviceId)
             newDeviceId
