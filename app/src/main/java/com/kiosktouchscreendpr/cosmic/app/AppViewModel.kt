@@ -199,11 +199,11 @@ class AppViewModel @Inject constructor(
      * Register device or resume heartbeat if already registered
      */
     private fun registerOrResumeDevice() = viewModelScope.launch {
-        Log.i(TAG, "🔵 registerOrResumeDevice: Starting device registration or resume")
+        Log.i(TAG, "[REGISTER] Starting device registration or resume")
         
         val existingToken = preference.get(AppConstant.REMOTE_TOKEN, null)
         if (!existingToken.isNullOrBlank()) {
-            Log.i(TAG, "✅ registerOrResumeDevice: Found existing token: ${existingToken.take(8)}...")
+            Log.i(TAG, "[REGISTER] Found existing token: ${existingToken.take(8)}...")
             // Try to resume with existing token
             connectionManager.connect(existingToken)
             
@@ -212,7 +212,7 @@ class AppViewModel @Inject constructor(
             return@launch
         }
         
-        Log.w(TAG, "⚠️ registerOrResumeDevice: No existing token, starting first-time registration")
+        Log.w(TAG, "[REGISTER] No existing token, starting first-time registration")
         // Not registered yet, do registration
         registerDeviceOnFirstLaunch()
     }
@@ -253,8 +253,12 @@ class AppViewModel @Inject constructor(
         try {
             val deviceId = getOrCreateDeviceId()
             val baseUrl = BuildConfig.WEBVIEW_BASEURL.takeIf { it.isNotBlank() }
-                ?: return@launch // Exit if no base URL configured
+                ?: run {
+                    Log.e(TAG, "WEBVIEW_BASEURL is empty, cannot register device")
+                    return@launch
+                }
             
+            Log.i(TAG, "Registering device: $deviceId with baseUrl: $baseUrl")
             val deviceName = "${Build.MANUFACTURER} ${Build.MODEL}".uppercase()
             
             val response = deviceApi.registerRemoteDevice(
@@ -265,14 +269,21 @@ class AppViewModel @Inject constructor(
             )
             
             if (response != null && response.success) {
+                Log.i(TAG, "Device registered successfully. Remote ID: ${response.data.remoteId}, Token: ${response.data.token.take(10)}...")
                 preference.set(AppConstant.REMOTE_ID, response.data.remoteId.toString())
                 preference.set(AppConstant.REMOTE_TOKEN, response.data.token)
                 
                 // START HEARTBEAT via ConnectionManager
+                Log.i(TAG, "Starting heartbeat after registration")
                 connectionManager.connect(response.data.token)
+                
+                // Monitor for auth errors
+                monitorAuthErrors()
+            } else {
+                Log.w(TAG, "Device registration returned false or null")
             }
         } catch (e: Exception) {
-            // Continue on error
+            Log.e(TAG, "Device registration failed", e)
         }
     }
 
