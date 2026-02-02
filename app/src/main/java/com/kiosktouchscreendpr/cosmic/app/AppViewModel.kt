@@ -65,7 +65,7 @@ class AppViewModel @Inject constructor(
     private val _state = MutableStateFlow(AppState())
     val state = _state
         .onStart {
-            registerDeviceOnFirstLaunch()
+            registerOrResumeDevice()
             observeConnectionManager()
             observeNetworkForConnectionManager()
             observeWsMessages()
@@ -196,6 +196,49 @@ class AppViewModel @Inject constructor(
     }
 
     /**
+     * Register device or resume heartbeat if already registered
+     */
+    private fun registerOrResumeDevice() = viewModelScope.launch {
+        val existingToken = preference.get(AppConstant.REMOTE_TOKEN, null)
+        if (!existingToken.isNullOrBlank()) {
+            // Try to resume with existing token
+            connectionManager.connect(existingToken)
+            
+            // Monitor connection state for auth errors
+            monitorAuthErrors()
+            return@launch
+        }
+        
+        // Not registered yet, do registration
+        registerDeviceOnFirstLaunch()
+    }
+    
+    /**
+     * Monitor for authentication errors (deleted device, invalid token)
+     * If detected, clear token and re-register
+     */
+    private fun monitorAuthErrors() = viewModelScope.launch {
+        connectionManager.connectionState.collect { state ->
+            if (state is ConnectionManager.ConnectionState.Error) {
+                // Check if it's an auth error (401/403)
+                if (state.message.contains("401") || 
+                    state.message.contains("403") ||
+                    state.message.contains("Unauthorized") ||
+                    state.message.contains("token")) {
+                    
+                    // Token invalid (device deleted from UI)
+                    // Clear token and re-register
+                    preference.set(AppConstant.REMOTE_TOKEN, "")
+                    preference.set(AppConstant.REMOTE_ID, "")
+                    
+                    // Trigger re-registration
+                    registerDeviceOnFirstLaunch()
+                }
+            }
+        }
+    }
+
+    /**
      * Register device pada first launch (untuk Remote menu)
      * Call POST /api/devices/register dengan device_id dan device info
      * Save remote_id & remote_token untuk keperluan remote control
@@ -205,8 +248,9 @@ class AppViewModel @Inject constructor(
     private fun registerDeviceOnFirstLaunch() = viewModelScope.launch {
         try {
             val deviceId = getOrCreateDeviceId()
+            val baseUrl = BuildConfig.WEBVIEW_BASEURL.takeIf { it.isNotBlank() }
+                ?: return@launch // Exit if no base URL configured
             
-            val baseUrl = BuildConfig.WEBVIEW_BASEURL
             val deviceName = "${Build.MANUFACTURER} ${Build.MODEL}".uppercase()
             
             val response = deviceApi.registerRemoteDevice(
