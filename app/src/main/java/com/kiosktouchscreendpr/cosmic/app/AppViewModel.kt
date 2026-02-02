@@ -198,10 +198,11 @@ class AppViewModel @Inject constructor(
      * Register device pada first launch (untuk Remote menu)
      * Call POST /api/devices/register dengan device_id dan device info
      * Save remote_id & remote_token untuk keperluan remote control
+     * 
+     * UPDATED: Start heartbeat after successful registration
      */
     private fun registerDeviceOnFirstLaunch() = viewModelScope.launch {
         try {
-            // Generate atau ambil device_id yang sudah ada
             val deviceId = getOrCreateDeviceId()
             
             val baseUrl = BuildConfig.WEBVIEW_BASEURL
@@ -215,16 +216,14 @@ class AppViewModel @Inject constructor(
             )
             
             if (response != null && response.success) {
-                // Save remote_id & remote_token untuk remote control
                 preference.set(AppConstant.REMOTE_ID, response.data.remoteId.toString())
                 preference.set(AppConstant.REMOTE_TOKEN, response.data.token)
                 
-                Log.d(TAG, "✅ Remote registered: remote_id=${response.data.remoteId}, device_id=$deviceId")
-            } else {
-                Log.w(TAG, "⚠️ Failed to register remote, but continuing anyway")
+                // START HEARTBEAT via ConnectionManager
+                connectionManager.connect(response.data.token)
             }
         } catch (e: Exception) {
-            Log.w(TAG, "⚠️ Error registering remote on first launch: ${e.message}")
+            // Continue on error
         }
     }
 
@@ -235,14 +234,10 @@ class AppViewModel @Inject constructor(
         val savedDeviceId = preference.get(AppConstant.DEVICE_ID, null)
         
         return if (savedDeviceId.isNullOrBlank()) {
-            // Generate device_id baru dari Build.SERIAL atau UUID
             val newDeviceId = Build.SERIAL.takeIf { it != "unknown" }
                 ?: UUID.randomUUID().toString().take(12)
             
-            // Simpan ke SharedPreferences
             preference.set(AppConstant.DEVICE_ID, newDeviceId)
-            
-            Log.d(TAG, "Generated new device_id: $newDeviceId")
             newDeviceId
         } else {
             savedDeviceId
