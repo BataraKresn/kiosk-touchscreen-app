@@ -2,6 +2,7 @@ package com.kiosktouchscreendpr.cosmic.app
 
 import android.content.Context
 import android.os.Build
+import android.provider.Settings
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -228,20 +229,14 @@ class AppViewModel @Inject constructor(
     }
 
     /**
-     * Generate device_id unik atau ambil dari SharedPreferences jika sudah ada
+     * Get persistent device ID that survives uninstall/reinstall
+     * Uses Android ID (ANDROID_ID) which is unique per device and persists across app reinstalls
      */
     private fun getOrCreateDeviceId(): String {
-        val savedDeviceId = preference.get(AppConstant.DEVICE_ID, null)
-        
-        return if (savedDeviceId.isNullOrBlank()) {
-            // Generate unique device ID (UUID-based untuk menghindari Build.SERIAL yang deprecated)
-            val newDeviceId = UUID.randomUUID().toString().take(16)
-            
-            preference.set(AppConstant.DEVICE_ID, newDeviceId)
-            newDeviceId
-        } else {
-            savedDeviceId
-        }
+        // Use Android ID - persistent across app uninstall/reinstall
+        val androidId = Settings.Secure.getString(context.contentResolver, Settings.Secure.ANDROID_ID)
+        return androidId?.takeIf { it.isNotBlank() }
+            ?: "device-${Build.MODEL.replace(" ", "-")}".lowercase()
     }
 
     /**
