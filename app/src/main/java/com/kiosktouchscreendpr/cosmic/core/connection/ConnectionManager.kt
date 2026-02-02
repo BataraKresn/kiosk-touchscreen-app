@@ -5,6 +5,7 @@ import android.os.PowerManager
 import android.util.Log
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ProcessLifecycleOwner
+import com.kiosktouchscreendpr.cosmic.core.utils.DeviceHealthMonitor
 import com.kiosktouchscreendpr.cosmic.data.api.DeviceRegistrationService
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
@@ -43,7 +44,8 @@ import kotlin.random.Random
 @Singleton
 class ConnectionManager @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val deviceRegistrationService: DeviceRegistrationService
+    private val deviceRegistrationService: DeviceRegistrationService,
+    private val deviceHealthMonitor: DeviceHealthMonitor
 ) {
 
     companion object {
@@ -278,6 +280,9 @@ class ConnectionManager @Inject constructor(
     /**
      * FIX #7: Timeout Correction
      * Timeout immediately terminates session and transitions state cleanly
+     * 
+     * FIX #10: Device Health Metrics Integration
+     * Collect and send real-time device metrics with every heartbeat
      */
     private suspend fun sendHeartbeatToCMS(): Result<DeviceRegistrationService.HeartbeatData> {
         val token = deviceToken ?: return Result.failure(Exception("No device token"))
@@ -286,18 +291,21 @@ class ConnectionManager @Inject constructor(
         
         return withTimeout(timeout) {
             try {
+                // Collect all device health metrics
+                val metrics = deviceHealthMonitor.getAllMetrics()
+                
                 deviceRegistrationService.sendHeartbeat(
                     token = token,
-                    batteryLevel = null, // TODO: Add device health metrics
-                    wifiStrength = null,
-                    screenOn = null,
-                    storageAvailableMB = null,
-                    storageTotalMB = null,
-                    ramUsageMB = null,
-                    ramTotalMB = null,
-                    cpuTemp = null,
-                    networkType = null,
-                    currentUrl = null
+                    batteryLevel = metrics.batteryLevel,
+                    wifiStrength = metrics.wifiStrength,
+                    screenOn = metrics.screenOn,
+                    storageAvailableMB = metrics.storageAvailableMB,
+                    storageTotalMB = metrics.storageTotalMB,
+                    ramUsageMB = metrics.ramUsageMB,
+                    ramTotalMB = metrics.ramTotalMB,
+                    cpuTemp = metrics.cpuTemp,
+                    networkType = metrics.networkType,
+                    currentUrl = null // TODO: Get from WebView if needed
                 )
             } catch (e: Exception) {
                 Result.failure(e)
