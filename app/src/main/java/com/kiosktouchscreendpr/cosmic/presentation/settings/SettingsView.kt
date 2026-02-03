@@ -23,7 +23,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Clear
-import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -386,27 +385,6 @@ fun SettingsScreen(
             ) {
                 Text("Settings")
             }
-        }
-        
-        // Remote Control Button
-        Button(
-            onClick = {
-                navController.navigate(Route.AppRemoteControl)
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-            colors = androidx.compose.material3.ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.tertiary
-            ),
-            shape = MaterialTheme.shapes.small,
-        ) {
-            Icon(
-                imageVector = Icons.Rounded.Home,
-                contentDescription = null
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("Remote Control")
         }
         
         Text(
