@@ -8,6 +8,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -118,7 +119,7 @@ fun RemoteControlScreen(
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(
-                            imageVector = Icons.Default.ArrowBack,
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back"
                         )
                     }
@@ -259,7 +260,7 @@ private fun StatusCard(
                 )
             }
             
-            Divider()
+            HorizontalDivider()
             
             // Status text
             Text(
@@ -333,7 +334,7 @@ private fun DeviceInfoCard(
                 fontWeight = FontWeight.Bold
             )
             
-            Divider()
+            HorizontalDivider()
             
             InfoRow(label = "Device ID", value = deviceId.ifEmpty { "Not registered" })
             InfoRow(
@@ -650,7 +651,7 @@ private fun HelpCard() {
                 style = MaterialTheme.typography.bodyMedium
             )
             
-            Divider(modifier = Modifier.padding(vertical = 8.dp))
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
             
             Text(
                 text = "⚠️ Important: Keep the app running for remote control to work",

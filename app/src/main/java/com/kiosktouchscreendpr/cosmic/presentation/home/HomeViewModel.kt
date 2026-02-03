@@ -50,6 +50,7 @@ class HomeViewModel @Inject constructor(
     val resetEvent = _resetEvent.asSharedFlow()
 
     private var isOnBaseUrl = true
+    private var lastRemoteRefreshAt = 0L
 
 
     private fun loadBaseUrl() = viewModelScope.launch {
@@ -69,7 +70,13 @@ class HomeViewModel @Inject constructor(
         refreshUseCase.observeMessages().collect { message ->
             when (message) {
                 is RefreshRes.Triggered -> {
-                    if (message.token == token) trigger()
+                    if (message.token == token) {
+                        val now = System.currentTimeMillis()
+                        if (now - lastRemoteRefreshAt > 30_000L) {
+                            lastRemoteRefreshAt = now
+                            trigger()
+                        }
+                    }
                 }
 
                 is RefreshRes.Error -> Unit
