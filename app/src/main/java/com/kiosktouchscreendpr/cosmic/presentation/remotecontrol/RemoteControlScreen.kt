@@ -57,25 +57,16 @@ fun RemoteControlScreen(
         context.getSharedPreferences("cosmic_prefs", android.content.Context.MODE_PRIVATE)
             .let { prefs ->
                 object : Preference {
-                    override fun <T> get(key: String, defaultValue: T): T {
-                        return when (defaultValue) {
-                            is String -> prefs.getString(key, defaultValue) as T
-                            is Int -> prefs.getInt(key, defaultValue) as T
-                            is Boolean -> prefs.getBoolean(key, defaultValue) as T
-                            is Long -> prefs.getLong(key, defaultValue) as T
-                            else -> defaultValue
-                        }
+                    override fun get(key: String, defaultValue: String?): String? {
+                        return prefs.getString(key, defaultValue)
                     }
-                    override fun <T> set(key: String, value: T) {
-                        prefs.edit().apply {
-                            when (value) {
-                                is String -> putString(key, value)
-                                is Int -> putInt(key, value)
-                                is Boolean -> putBoolean(key, value)
-                                is Long -> putLong(key, value)
-                            }
-                            apply()
-                        }
+                    
+                    override fun set(key: String, value: String) {
+                        prefs.edit().putString(key, value).apply()
+                    }
+                    
+                    override fun remove(key: String) {
+                        prefs.edit().remove(key).apply()
                     }
                 }
             }
@@ -156,9 +147,9 @@ fun RemoteControlScreen(
             
             // Device Info Card
             DeviceInfoCard(
-                deviceId = deviceId,
-                deviceToken = deviceToken,
-                relayServerUrl = relayServerUrl
+                deviceId = deviceId ?: "",
+                deviceToken = deviceToken ?: "",
+                relayServerUrl = relayServerUrl ?: ""
             )
             
             // Permissions Warning
@@ -176,9 +167,9 @@ fun RemoteControlScreen(
             when (remoteControlState) {
                 is RemoteControlState.Idle -> {
                     StartRemoteControlButton(
-                        deviceId = deviceId,
-                        deviceToken = deviceToken,
-                        relayServerUrl = relayServerUrl,
+                        deviceId = deviceId ?: "",
+                        deviceToken = deviceToken ?: "",
+                        relayServerUrl = relayServerUrl ?: "",
                         isAccessibilityEnabled = isAccessibilityEnabled,
                         onStart = { id, token, url ->
                             viewModel.startRemoteControl(
@@ -212,9 +203,9 @@ fun RemoteControlScreen(
                         onRetry = {
                             viewModel.startRemoteControl(
                                 context = context,
-                                deviceId = deviceId,
-                                authToken = deviceToken,
-                                relayServerUrl = relayServerUrl
+                                deviceId = deviceId ?: "",
+                                authToken = deviceToken ?: "",
+                                relayServerUrl = relayServerUrl ?: ""
                             )
                         }
                     )
