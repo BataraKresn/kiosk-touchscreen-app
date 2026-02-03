@@ -4,12 +4,14 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.media.projection.MediaProjectionManager
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kiosktouchscreendpr.cosmic.data.services.InputInjectionService
 import com.kiosktouchscreendpr.cosmic.data.services.RemoteControlWebSocketClient
 import com.kiosktouchscreendpr.cosmic.data.services.ScreenCaptureService
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -41,7 +43,9 @@ class RemoteControlViewModel @Inject constructor(
     ) {
         viewModelScope.launch {
             try {
+                Log.d("RemoteControlVM", "Starting remote control - deviceId: $deviceId, serverUrl: $relayServerUrl")
                 _remoteControlState.value = RemoteControlState.Starting
+                _connectionStatus.value = ConnectionStatus.Connecting
                 
                 // Initialize WebSocket connection
                 webSocketClient.connect(
@@ -50,10 +54,27 @@ class RemoteControlViewModel @Inject constructor(
                     devId = deviceId
                 )
                 
-                _connectionStatus.value = ConnectionStatus.Connected
-                _remoteControlState.value = RemoteControlState.Active
+                // Wait for actual connection (with timeout of 10 seconds)
+                var attempts = 0
+                val maxAttempts = 20 // 20 * 500ms = 10 seconds
+                while (webSocketClient.connectionState.value != RemoteControlWebSocketClient.ConnectionState.CONNECTED && attempts < maxAttempts) {
+                    delay(500) // Check every 500ms
+                    attempts++
+                    Log.d("RemoteControlVM", "Waiting for connection... attempt $attempts/${maxAttempts}, state: ${webSocketClient.connectionState.value}")
+                }
+                
+                if (webSocketClient.connectionState.value == RemoteControlWebSocketClient.ConnectionState.CONNECTED) {
+                    Log.d("RemoteControlVM", "WebSocket connected successfully")
+                    _connectionStatus.value = ConnectionStatus.Connected
+                    _remoteControlState.value = RemoteControlState.Active
+                } else {
+                    Log.e("RemoteControlVM", "Failed to connect. State: ${webSocketClient.connectionState.value}")
+                    _remoteControlState.value = RemoteControlState.Error("Failed to connect to relay server after ${attempts * 500}ms")
+                    _connectionStatus.value = ConnectionStatus.Disconnected
+                }
                 
             } catch (e: Exception) {
+                Log.e("RemoteControlVM", "Error in startRemoteControl", e)
                 _remoteControlState.value = RemoteControlState.Error(e.message ?: "Unknown error")
                 _connectionStatus.value = ConnectionStatus.Error(e.message ?: "Connection failed")
             }
@@ -74,13 +95,25 @@ class RemoteControlViewModel @Inject constructor(
      * Handle screen capture permission result
      */
     fun onScreenCapturePermissionGranted(context: Context, resultCode: Int, data: Intent?) {
-        if (resultCode == Activity.RESULT_OK && data != null) {
-            // Start ScreenCaptureService
-            val intent = Intent(context, ScreenCaptureService::class.java).apply {
-                putExtra("resultCode", resultCode)
-                putExtra("data", data)
+        viewModelScope.launch {
+            if (resultCode == Activity.RESULT_OK && data != null) {
+                try {
+                    // Wait a bit for WebSocket to establish
+                    delay(500)
+                    
+                    // Start ScreenCaptureService
+                    val intent = Intent(context, ScreenCaptureService::class.java).apply {
+                        putExtra("resultCode", resultCode)
+                        putExtra("data", data)
+                    }
+                    context.startForegroundService(intent)
+                } catch (e: Exception) {
+                    _remoteControlState.value = RemoteControlState.Error("Failed to start screen capture: ${e.message}")
+                }
+            } else {
+                _remoteControlState.value = RemoteControlState.Error("Screen capture permission denied")
+                _connectionStatus.value = ConnectionStatus.Disconnected
             }
-            context.startForegroundService(intent)
         }
     }
 

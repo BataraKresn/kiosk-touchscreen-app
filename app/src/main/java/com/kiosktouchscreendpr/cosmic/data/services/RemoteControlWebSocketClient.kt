@@ -182,6 +182,7 @@ class RemoteControlWebSocketClient @Inject constructor(
      */
     private suspend fun sendAuthenticationMessage() {
         try {
+            Log.d(TAG, "Sending auth - deviceId: $deviceId, token: $deviceToken")
             val authMessage = JSONObject().apply {
                 put("type", "auth")
                 put("role", "device")
@@ -192,7 +193,7 @@ class RemoteControlWebSocketClient @Inject constructor(
             }
             
             session?.send(Frame.Text(authMessage.toString()))
-            Log.d(TAG, "Authentication message sent")
+            Log.d(TAG, "Authentication message sent: ${authMessage.toString()}")
             
         } catch (e: Exception) {
             Log.e(TAG, "Failed to send authentication", e)
