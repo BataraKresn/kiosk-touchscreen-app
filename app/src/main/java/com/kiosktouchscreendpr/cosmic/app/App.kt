@@ -15,6 +15,7 @@ import com.kiosktouchscreendpr.cosmic.app.AppState.Status
 import com.kiosktouchscreendpr.cosmic.core.utils.HideSystemBars
 import com.kiosktouchscreendpr.cosmic.presentation.auth.AuthViewRoot
 import com.kiosktouchscreendpr.cosmic.presentation.home.HomeViewRoot
+import com.kiosktouchscreendpr.cosmic.presentation.remotecontrol.RemoteControlScreen
 import com.kiosktouchscreendpr.cosmic.presentation.settings.SettingsRoot
 import com.kiosktouchscreendpr.cosmic.ui.theme.CosmicTheme
 
@@ -79,6 +80,14 @@ fun AppNavHost(
 
         composable<Route.AppHome> {
             HomeViewRoot(navController)
+        }
+
+        composable<Route.AppRemoteControl> {
+            RemoteControlScreen(
+                onNavigateBack = {
+                    navController.popBackStack()
+                }
+            )
         }
     }
 }

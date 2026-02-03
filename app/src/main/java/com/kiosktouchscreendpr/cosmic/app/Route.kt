@@ -11,4 +11,7 @@ sealed class Route {
 
     @Serializable
     data object AppHome : Route()
+
+    @Serializable
+    data object AppRemoteControl : Route()
 }

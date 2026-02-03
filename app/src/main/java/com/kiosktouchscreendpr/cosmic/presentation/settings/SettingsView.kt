@@ -86,7 +86,8 @@ fun SettingsRoot(
         state = state,
         onAction = viewModel::onEvent,
         onShowPowerOffPicker = { showPowerOffPicker = true },
-        onShowPowerOnPicker = { showPowerOnPicker = true }
+        onShowPowerOnPicker = { showPowerOnPicker = true },
+        navController = navController
     )
 
     DialogManager(
@@ -141,6 +142,7 @@ fun SettingsScreen(
     onAction: (SettingsEvent) -> Unit,
     onShowPowerOffPicker: () -> Unit,
     onShowPowerOnPicker: () -> Unit,
+    navController: NavController,
     context: Context = LocalContext.current
 ) {
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -315,6 +317,28 @@ fun SettingsScreen(
                 Text("Settings")
             }
         }
+        
+        // Remote Control Button
+        Button(
+            onClick = {
+                navController.navigate(Route.AppRemoteControl)
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.tertiary
+            ),
+            shape = MaterialTheme.shapes.small,
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.Home,
+                contentDescription = null
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("Remote Control")
+        }
+        
         Text(
             text = "App Version: 1.0.0",
             style = MaterialTheme.typography.bodyMedium.copy(
