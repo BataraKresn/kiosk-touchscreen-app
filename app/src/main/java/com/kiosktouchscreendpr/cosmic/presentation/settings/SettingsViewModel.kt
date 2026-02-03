@@ -1,6 +1,8 @@
 package com.kiosktouchscreendpr.cosmic.presentation.settings
 
+import android.content.Context
 import android.content.SharedPreferences
+import android.provider.Settings
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -13,6 +15,7 @@ import com.kiosktouchscreendpr.cosmic.core.scheduler.PowerOnSchedule
 import com.kiosktouchscreendpr.cosmic.data.api.DeviceApi
 import com.kiosktouchscreendpr.cosmic.data.dto.RegisterDeviceRequest
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -29,6 +32,7 @@ class SettingsViewModel @Inject constructor(
     private val powerOffSchedule: PowerOffSchedule,
     private val powerOnSchedule: PowerOnSchedule,
     private val deviceApi: DeviceApi,
+    @ApplicationContext private val context: Context,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(SettingsState())
@@ -112,6 +116,9 @@ class SettingsViewModel @Inject constructor(
         // Register display to backend (optional, non-blocking)
         registerDisplayToken(_state.value.token)
 
+        // Register device to remote-control backend (required for relay auth)
+        registerRemoteDeviceAndStore()
+
         // Schedule alarms
         _state.value.powerOffTime?.let { powerOff ->
             _state.value.powerOnTime?.let { powerOn ->
@@ -125,7 +132,7 @@ class SettingsViewModel @Inject constructor(
      * Register display token ke backend CMS
      * Non-blocking, tidak akan error jika backend tidak ada atau gagal
      */
-    private fun registerDisplayToken(token: String) = viewModelScope.launch {
+    private suspend fun registerDisplayToken(token: String) {
         try {
             val baseUrl = BuildConfig.WEBVIEW_BASEURL
             val request = RegisterDeviceRequest(
@@ -149,6 +156,41 @@ class SettingsViewModel @Inject constructor(
         } catch (e: Exception) {
             // Tidak perlu error karena ini optional
             Log.w(TAG, "⚠️ Error registering display token: ${e.message}")
+        }
+    }
+
+    /**
+     * Register device to remote-control backend and store remote_id/token
+     */
+    private suspend fun registerRemoteDeviceAndStore() {
+        try {
+            val baseUrl = BuildConfig.WEBVIEW_BASEURL
+            val deviceId = Settings.Secure.getString(
+                context.contentResolver,
+                Settings.Secure.ANDROID_ID
+            ) ?: ""
+            val deviceName = "${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}"
+
+            val response = deviceApi.registerRemoteDevice(
+                baseUrl = baseUrl,
+                deviceId = deviceId,
+                deviceName = deviceName,
+                appVersion = BuildConfig.VERSION_NAME
+            )
+
+            if (response?.success == true) {
+                preferences.edit().apply {
+                    putString(AppConstant.DEVICE_ID, deviceId)
+                    putString(AppConstant.REMOTE_ID, response.data.remoteId.toString())
+                    putString(AppConstant.REMOTE_TOKEN, response.data.token)
+                    apply()
+                }
+                Log.d(TAG, "✅ Remote registered: remote_id=${response.data.remoteId}")
+            } else {
+                Log.w(TAG, "⚠️ Remote registration failed, response null or invalid")
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "⚠️ Error registering remote: ${e.message}")
         }
     }
     

@@ -54,7 +54,7 @@ fun RemoteControlScreen(
     
     // Get shared preferences for device credentials
     val preference = remember {
-        context.getSharedPreferences("cosmic_prefs", android.content.Context.MODE_PRIVATE)
+        context.getSharedPreferences("app_prefs", android.content.Context.MODE_PRIVATE)
             .let { prefs ->
                 object : Preference {
                     override fun get(key: String, defaultValue: String?): String? {

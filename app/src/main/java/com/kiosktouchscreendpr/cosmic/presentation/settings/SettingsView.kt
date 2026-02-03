@@ -4,8 +4,11 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.media.projection.MediaProjectionManager
 import android.provider.Settings
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -51,7 +54,10 @@ import androidx.compose.foundation.layout.width
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
+import com.kiosktouchscreendpr.cosmic.BuildConfig
 import com.kiosktouchscreendpr.cosmic.app.Route
+import com.kiosktouchscreendpr.cosmic.core.constant.AppConstant
+import com.kiosktouchscreendpr.cosmic.presentation.remotecontrol.RemoteControlViewModel
 import java.util.Calendar
 
 @Composable
@@ -61,12 +67,73 @@ fun SettingsRoot(
 ) {
     val context = LocalContext.current
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val remoteControlViewModel: RemoteControlViewModel = hiltViewModel()
+
+    val prefs = remember {
+        context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
+    }
+
+    val relayServerUrl = remember {
+        val baseUrl = BuildConfig.WEBVIEW_BASEURL.takeIf { it.isNotBlank() } ?: "https://kiosk.mugshot.dev"
+        baseUrl.replace("https://", "wss://").replace("http://", "ws://") + "/remote-control-ws"
+    }
+
+    var autoStartRequested by remember { mutableStateOf(false) }
+
+    val screenCaptureLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val deviceId = prefs.getString(AppConstant.REMOTE_ID, "") ?: ""
+            val deviceToken = prefs.getString(AppConstant.REMOTE_TOKEN, "") ?: ""
+            if (deviceId.isNotEmpty() && deviceToken.isNotEmpty()) {
+                remoteControlViewModel.startRemoteControl(
+                    context = context,
+                    deviceId = deviceId,
+                    authToken = deviceToken,
+                    relayServerUrl = relayServerUrl
+                )
+                remoteControlViewModel.onScreenCapturePermissionGranted(
+                    context = context,
+                    resultCode = result.resultCode,
+                    data = result.data
+                )
+            } else {
+                Toast.makeText(
+                    context,
+                    "Remote Control belum terdaftar. Coba submit ulang.",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        } else {
+            Toast.makeText(
+                context,
+                "Izin screen capture dibutuhkan untuk Remote Control.",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
 
     var showPowerOffPicker by remember { mutableStateOf(false) }
     var showPowerOnPicker by remember { mutableStateOf(false) }
 
     LaunchedEffect(state.isSuccess) {
         if (state.isSuccess) {
+            if (!autoStartRequested) {
+                autoStartRequested = true
+                val deviceId = prefs.getString(AppConstant.REMOTE_ID, "") ?: ""
+                val deviceToken = prefs.getString(AppConstant.REMOTE_TOKEN, "") ?: ""
+                if (deviceId.isNotEmpty() && deviceToken.isNotEmpty()) {
+                    val manager = context.getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+                    screenCaptureLauncher.launch(manager.createScreenCaptureIntent())
+                } else {
+                    Toast.makeText(
+                        context,
+                        "Remote Control belum terdaftar. Coba submit ulang.",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            }
             navController.navigate(Route.AppHome) {
                 popUpTo(Route.AppSettings) {
                     inclusive = true
