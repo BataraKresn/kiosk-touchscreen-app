@@ -161,16 +161,25 @@ class SettingsViewModel @Inject constructor(
 
     /**
      * Register device to remote-control backend and store remote_id/token
+     * Enhanced with detailed logging for diagnostics
      */
     private suspend fun registerRemoteDeviceAndStore() {
+        Log.d(TAG, "🔵 START: registerRemoteDeviceAndStore()")
         try {
             val baseUrl = BuildConfig.WEBVIEW_BASEURL
+            Log.d(TAG, "📍 Base URL: $baseUrl")
+            
             val deviceId = Settings.Secure.getString(
                 context.contentResolver,
                 Settings.Secure.ANDROID_ID
             ) ?: ""
+            Log.d(TAG, "📱 Device ID: $deviceId")
+            
             val deviceName = "${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}"
+            Log.d(TAG, "🏷️ Device Name: $deviceName")
+            Log.d(TAG, "📦 App Version: ${BuildConfig.VERSION_NAME}")
 
+            Log.d(TAG, "🌐 Calling API: registerRemoteDevice()")
             val response = deviceApi.registerRemoteDevice(
                 baseUrl = baseUrl,
                 deviceId = deviceId,
@@ -178,20 +187,38 @@ class SettingsViewModel @Inject constructor(
                 appVersion = BuildConfig.VERSION_NAME
             )
 
-            if (response?.success == true) {
-                preferences.edit().apply {
-                    putString(AppConstant.DEVICE_ID, deviceId)
-                    putString(AppConstant.REMOTE_ID, response.data.remoteId.toString())
-                    putString(AppConstant.REMOTE_TOKEN, response.data.token)
-                    apply()
+            if (response != null) {
+                Log.d(TAG, "✅ API Response received: success=${response.success}")
+                Log.d(TAG, "📊 Response data: remoteId=${response.data.remoteId}, token=${response.data.token.take(10)}...")
+                
+                if (response.success == true) {
+                    Log.d(TAG, "💾 Saving to SharedPreferences...")
+                    preferences.edit().apply {
+                        putString(AppConstant.DEVICE_ID, deviceId)
+                        Log.d(TAG, "  ✓ Saved DEVICE_ID: $deviceId")
+                        
+                        putString(AppConstant.REMOTE_ID, response.data.remoteId.toString())
+                        Log.d(TAG, "  ✓ Saved REMOTE_ID: ${response.data.remoteId}")
+                        
+                        putString(AppConstant.REMOTE_TOKEN, response.data.token)
+                        Log.d(TAG, "  ✓ Saved REMOTE_TOKEN: ${response.data.token.take(10)}...")
+                        
+                        apply()
+                        Log.d(TAG, "  ✓ Preferences apply() complete")
+                    }
+                    Log.d(TAG, "✅ Remote registration SUCCESS: remote_id=${response.data.remoteId}")
+                } else {
+                    Log.e(TAG, "❌ Remote registration FAILED: success=false")
+                    Log.e(TAG, "   Message: ${response.message}")
                 }
-                Log.d(TAG, "✅ Remote registered: remote_id=${response.data.remoteId}")
             } else {
-                Log.w(TAG, "⚠️ Remote registration failed, response null or invalid")
+                Log.e(TAG, "❌ API Response is NULL - network error or server issue")
             }
         } catch (e: Exception) {
-            Log.w(TAG, "⚠️ Error registering remote: ${e.message}")
+            Log.e(TAG, "❌ EXCEPTION in registerRemoteDeviceAndStore(): ${e.message}", e)
+            e.printStackTrace()
         }
+        Log.d(TAG, "🔴 END: registerRemoteDeviceAndStore()")
     }
     
     companion object {

@@ -39,24 +39,48 @@ class DeviceApi @Inject constructor(
         appVersion: String
     ): RegisterRemoteResponse? {
         return try {
+            Log.d("DeviceApi", "🔵 START: registerRemoteDevice()")
+            Log.d("DeviceApi", "📍 Target: $baseUrl/api/devices/register")
+            
+            val macAddress = getMacAddress()
+            val androidVersion = Build.VERSION.RELEASE
+            val ipAddress = getLocalIpAddress()
+            
+            Log.d("DeviceApi", "📦 Request payload:")
+            Log.d("DeviceApi", "  - deviceName: $deviceName")
+            Log.d("DeviceApi", "  - deviceId: $deviceId")
+            Log.d("DeviceApi", "  - macAddress: $macAddress")
+            Log.d("DeviceApi", "  - androidVersion: $androidVersion")
+            Log.d("DeviceApi", "  - appVersion: $appVersion")
+            Log.d("DeviceApi", "  - ipAddress: $ipAddress")
+            
             val request = RemoteRegisterRequest(
                 deviceName = deviceName,
                 deviceId = deviceId,
-                macAddress = getMacAddress(),
-                androidVersion = Build.VERSION.RELEASE,
+                macAddress = macAddress,
+                androidVersion = androidVersion,
                 appVersion = appVersion,
-                ipAddress = getLocalIpAddress()
+                ipAddress = ipAddress
             )
 
+            Log.d("DeviceApi", "🌐 Sending HTTP POST request...")
             val response = client.post("$baseUrl/api/devices/register") {
                 contentType(ContentType.Application.Json)
                 setBody(request)
             }.body<RegisterRemoteResponse>()
 
-            Log.d("DeviceApi", "✅ Remote registered: remote_id=${response.data.remoteId}")
+            Log.d("DeviceApi", "✅ HTTP Response received successfully")
+            Log.d("DeviceApi", "  - success: ${response.success}")
+            Log.d("DeviceApi", "  - message: ${response.message}")
+            Log.d("DeviceApi", "  - remote_id: ${response.data.remoteId}")
+            Log.d("DeviceApi", "  - token: ${response.data.token.take(10)}...")
+            
             response
         } catch (e: Exception) {
-            Log.w("DeviceApi", "Failed to register remote: ${e.message}", e)
+            Log.e("DeviceApi", "❌ EXCEPTION in registerRemoteDevice(): ${e.message}", e)
+            Log.e("DeviceApi", "   Exception type: ${e::class.simpleName}")
+            Log.e("DeviceApi", "   Cause: ${e.cause?.message}")
+            e.printStackTrace()
             null
         }
     }
