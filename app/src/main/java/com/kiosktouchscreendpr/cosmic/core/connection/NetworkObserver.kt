@@ -5,6 +5,7 @@ import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
+import android.os.Build
 import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
@@ -222,14 +223,18 @@ class NetworkObserver @Inject constructor(
             else -> NetworkStatus.TransportType.NONE
         }
 
-        val signalStrength = capabilities.signalStrength
+        val signalStrength = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            capabilities.signalStrength
+        } else {
+            null
+        }
         
         return NetworkStatus(
             isAvailable = true,
             isValidated = capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED),
             isMetered = !capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED),
             transportType = transportType,
-            signalStrength = if (signalStrength in 0..100) signalStrength else null
+            signalStrength = if (signalStrength != null && signalStrength in 0..100) signalStrength else null
         )
     }
 

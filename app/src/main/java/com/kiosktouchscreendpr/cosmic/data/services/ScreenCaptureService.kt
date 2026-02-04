@@ -106,7 +106,12 @@ class ScreenCaptureService : Service() {
         
         intent?.let {
             val resultCode = it.getIntExtra("resultCode", -1)
-            val data = it.getParcelableExtra<Intent>("data")
+            val data = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                it.getParcelableExtra("data", Intent::class.java)
+            } else {
+                @Suppress("DEPRECATION")
+                it.getParcelableExtra<Intent>("data")
+            }
             
             if (resultCode != -1 && data != null) {
                 startCapture(resultCode, data)
