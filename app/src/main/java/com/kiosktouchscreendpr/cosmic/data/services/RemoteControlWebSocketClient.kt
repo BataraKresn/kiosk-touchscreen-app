@@ -227,6 +227,11 @@ class RemoteControlWebSocketClient @Inject constructor(
                     Log.d(TAG, "Authentication successful")
                 }
                 
+                "error" -> {
+                    val messageText = json.optString("message", "Unknown error")
+                    Log.w(TAG, "Server error message: $messageText")
+                }
+                
                 "auth_failed" -> {
                     val reason = json.optString("reason", "Unknown")
                     Log.e(TAG, "Authentication failed: $reason")
