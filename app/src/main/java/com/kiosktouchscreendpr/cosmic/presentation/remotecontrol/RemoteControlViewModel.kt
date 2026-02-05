@@ -110,10 +110,23 @@ class RemoteControlViewModel @Inject constructor(
                     delay(500)
                     
                     Log.e("RemoteControlVM", "🎬🎬🎬 Starting ScreenCaptureService NOW!")
+                    
+                    // Store MediaProjection data in SharedPreferences as it cannot be properly parceled through Intent
+                    val prefs = context.getSharedPreferences("ScreenCaptureData", Context.MODE_PRIVATE)
+                    prefs.edit().apply {
+                        putInt("resultCode", resultCode)
+                        // Cannot serialize Intent directly, so we'll handle it differently
+                        apply()
+                    }
+                    
+                    // Store the Intent data temporarily in a companion object to be picked up by the service
+                    ScreenCaptureService.setMediaProjectionData(resultCode, data)
+                    
+                    Log.e("RemoteControlVM", "💾 Stored MediaProjection data in companion object")
+                    
                     // Start ScreenCaptureService
                     val intent = Intent(context, ScreenCaptureService::class.java).apply {
                         putExtra("resultCode", resultCode)
-                        putExtra("data", data)
                     }
                     context.startForegroundService(intent)
                     Log.e("RemoteControlVM", "✅✅✅ ScreenCaptureService.startForegroundService() called successfully!")
