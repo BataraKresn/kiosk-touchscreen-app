@@ -73,30 +73,9 @@ class ScreenCaptureService : Service() {
         const val ACTION_FRAME_AVAILABLE = "com.kiosktouchscreendpr.cosmic.FRAME_AVAILABLE"
         
         // Static holder for MediaProjection data (cannot be parceled through Intent extras)
-        private var mediaProjectionResultCode: Int = -1
-        private var mediaProjectionData: Intent? = null
-        
-        fun setMediaProjectionData(resultCode: Int, data: Intent?) {
-            Log.e(TAG, "💾 Storing MediaProjection data - resultCode: $resultCode, data: $data")
-            mediaProjectionResultCode = resultCode
-            mediaProjectionData = data
-        }
-        
-        fun getMediaProjectionData(): Pair<Int, Intent?>? {
-            return if (mediaProjectionResultCode >= 0 && mediaProjectionData != null) {
-                Log.e(TAG, "📦 Retrieved stored MediaProjection data - resultCode: $mediaProjectionResultCode")
-                Pair(mediaProjectionResultCode, mediaProjectionData)
-            } else {
-                Log.e(TAG, "⚠️ No stored MediaProjection data available")
-                null
-            }
-        }
-        
-        fun clearMediaProjectionData() {
-            Log.e(TAG, "🧹 Clearing MediaProjection data")
-            mediaProjectionResultCode = -1
-            mediaProjectionData = null
-        }
+        // These are set by RemoteControlViewModel BEFORE the service is started
+        var mediaProjectionResultCode: Int = -1
+        var mediaProjectionData: Intent? = null
     }
 
     // MediaProjection components
@@ -139,40 +118,32 @@ class ScreenCaptureService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.e(TAG, "📹📹📹 onStartCommand called!")
-        Log.e(TAG, "📦 Intent: $intent")
         
-        // Try to get MediaProjection data from stored companion object first
+        // Try to get MediaProjection data from companion object
         var resultCode: Int? = null
         var data: Intent? = null
         
-        // First, try to get from companion object (preferred method)
-        val storedData = getMediaProjectionData()
-        if (storedData != null) {
-            resultCode = storedData.first
-            data = storedData.second
-            Log.e(TAG, "✅ Retrieved MediaProjection data from companion object - resultCode: $resultCode, data: $data")
-            clearMediaProjectionData() // Clear after retrieval
+        Log.e(TAG, "📦 Checking companion object - mediaProjectionResultCode: $mediaProjectionResultCode, mediaProjectionData: $mediaProjectionData")
+        
+        if (mediaProjectionResultCode >= 0 && mediaProjectionData != null) {
+            resultCode = mediaProjectionResultCode
+            data = mediaProjectionData
+            Log.e(TAG, "✅ Retrieved MediaProjection data from companion object!")
+            Log.e(TAG, "   resultCode: $resultCode")
+            Log.e(TAG, "   data: $data")
         } else {
-            // Fallback to Intent extras (if somehow they are available)
+            Log.e(TAG, "⚠️ No stored MediaProjection data in companion object - trying Intent extras as fallback")
             intent?.let {
                 resultCode = it.getIntExtra("resultCode", -1)
-                Log.e(TAG, "📊 resultCode from Intent: $resultCode")
-                
-                data = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    it.getParcelableExtra("data", Intent::class.java)
-                } else {
-                    @Suppress("DEPRECATION")
-                    it.getParcelableExtra<Intent>("data")
-                }
-                Log.e(TAG, "📦 MediaProjection data from Intent: $data")
+                Log.e(TAG, "   resultCode from Intent: $resultCode")
             }
         }
         
         Log.e(TAG, "Final check - resultCode: $resultCode, data: $data")
         
-        // Activity.RESULT_OK = -1, so we check if resultCode equals RESULT_OK (not "!= -1")
+        // Activity.RESULT_OK = -1
         if (resultCode == Activity.RESULT_OK && data != null) {
-            Log.e(TAG, "🎬🎬🎬 Starting screen capture with resultCode=$resultCode")
+            Log.e(TAG, "🎬🎬🎬 Starting screen capture!")
             startCapture(resultCode, data)
         } else {
             Log.e(TAG, "❌ Cannot start capture - resultCode: $resultCode (expected: ${Activity.RESULT_OK}), data: $data")
