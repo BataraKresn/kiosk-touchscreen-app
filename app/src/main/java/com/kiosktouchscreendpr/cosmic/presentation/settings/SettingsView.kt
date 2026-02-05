@@ -82,13 +82,13 @@ fun SettingsRoot(
     val screenCaptureLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
-        android.util.Log.d("SettingsView", "Screen capture result: ${result.resultCode}")
+        android.util.Log.e("SettingsView", "🎥 Screen capture result: ${result.resultCode} (RESULT_OK=${Activity.RESULT_OK})")
         if (result.resultCode == Activity.RESULT_OK) {
             val deviceId = prefs.getString(AppConstant.REMOTE_ID, "") ?: ""
             val deviceToken = prefs.getString(AppConstant.REMOTE_TOKEN, "") ?: ""
-            android.util.Log.d("SettingsView", "Got device prefs - ID: $deviceId, Token: $deviceToken")
+            android.util.Log.e("SettingsView", "📱 Got device prefs - ID: $deviceId, Token: $deviceToken")
             if (deviceId.isNotEmpty() && deviceToken.isNotEmpty()) {
-                android.util.Log.d("SettingsView", "Starting remote control with: $relayServerUrl")
+                android.util.Log.e("SettingsView", "🚀🚀🚀 Starting remote control with: $relayServerUrl 🚀🚀🚀")
                 remoteControlViewModel.startRemoteControl(
                     context = context,
                     deviceId = deviceId,
@@ -122,19 +122,20 @@ fun SettingsRoot(
     var showPowerOnPicker by remember { mutableStateOf(false) }
 
     LaunchedEffect(state.isSuccess) {
+        android.util.Log.e("SettingsView", "🔵 LaunchedEffect triggered - state.isSuccess=${state.isSuccess}")
         if (state.isSuccess) {
             if (!autoStartRequested) {
-                android.util.Log.d("SettingsView", "Submit success! Auto-requesting screen capture permission")
+                android.util.Log.e("SettingsView", "✅✅✅ Submit success! Auto-requesting screen capture permission ✅✅✅")
                 autoStartRequested = true
                 val deviceId = prefs.getString(AppConstant.REMOTE_ID, "") ?: ""
                 val deviceToken = prefs.getString(AppConstant.REMOTE_TOKEN, "") ?: ""
-                android.util.Log.d("SettingsView", "Stored prefs - ID: $deviceId, Token: $deviceToken")
+                android.util.Log.e("SettingsView", "📱 Stored prefs - ID: $deviceId, Token: $deviceToken")
                 if (deviceId.isNotEmpty() && deviceToken.isNotEmpty()) {
                     val manager = context.getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
-                    android.util.Log.d("SettingsView", "Launching screen capture intent")
+                    android.util.Log.e("SettingsView", "🚀 Launching screen capture intent")
                     screenCaptureLauncher.launch(manager.createScreenCaptureIntent())
                 } else {
-                    android.util.Log.e("SettingsView", "Cannot start remote - prefs empty")
+                    android.util.Log.e("SettingsView", "❌ Cannot start remote - prefs empty")
                     Toast.makeText(
                         context,
                         "Remote Control belum terdaftar. Coba submit ulang.",

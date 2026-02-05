@@ -43,7 +43,7 @@ class RemoteControlViewModel @Inject constructor(
     ) {
         viewModelScope.launch {
             try {
-                Log.d("RemoteControlVM", "Starting remote control - deviceId: $deviceId, serverUrl: $relayServerUrl")
+                Log.e("RemoteControlVM", "🚀🚀🚀 Starting remote control - deviceId: $deviceId, serverUrl: $relayServerUrl 🚀🚀🚀")
                 _remoteControlState.value = RemoteControlState.Starting
                 _connectionStatus.value = ConnectionStatus.Connecting
                 

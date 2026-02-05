@@ -99,7 +99,8 @@ class RemoteControlWebSocketClient @Inject constructor(
         deviceToken = token
         deviceId = devId
         
-        Log.d(TAG, "Connecting to relay server: $wsUrl")
+        Log.e(TAG, "🌐🌐🌐 Connecting to relay server: $wsUrl 🌐🌐🌐")
+        Log.e(TAG, "📱 DeviceID: $devId, Token: $token")
         _connectionState.value = ConnectionState.CONNECTING
         
         connectionJob?.cancel()
