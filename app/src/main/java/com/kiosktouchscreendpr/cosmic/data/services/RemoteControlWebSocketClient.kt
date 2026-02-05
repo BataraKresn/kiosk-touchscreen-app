@@ -205,8 +205,8 @@ class RemoteControlWebSocketClient @Inject constructor(
      */
     private fun handleIncomingMessage(message: String) {
         try {
+            // Handle plain text pong (backward compatibility)
             if (message == "pong") {
-                // Heartbeat response
                 lastHeartbeatResponse = System.currentTimeMillis()
                 Log.v(TAG, "Heartbeat pong received")
                 return
@@ -216,6 +216,12 @@ class RemoteControlWebSocketClient @Inject constructor(
             val type = json.getString("type")
             
             when (type) {
+                "pong" -> {
+                    // Heartbeat response (JSON format)
+                    lastHeartbeatResponse = System.currentTimeMillis()
+                    Log.v(TAG, "Heartbeat pong received")
+                }
+                
                 "auth_success" -> {
                     Log.d(TAG, "Authentication successful")
                 }
@@ -293,8 +299,11 @@ class RemoteControlWebSocketClient @Inject constructor(
         heartbeatJob = scope.launch {
             while (isActive && isConnected) {
                 try {
-                    // Send heartbeat
-                    session?.send(Frame.Text("ping"))
+                    // Send heartbeat in JSON format
+                    val heartbeatMessage = JSONObject().apply {
+                        put("type", "ping")
+                    }.toString()
+                    session?.send(Frame.Text(heartbeatMessage))
                     Log.v(TAG, "Heartbeat ping sent")
                     
                     // Check for timeout
