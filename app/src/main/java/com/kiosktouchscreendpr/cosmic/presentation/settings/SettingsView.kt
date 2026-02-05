@@ -392,17 +392,7 @@ fun SettingsScreen(
                 modifier = Modifier.padding(top = 10.dp),
                 shape = MaterialTheme.shapes.small,
             ) {
-                Text("Device Settings")
-            }
-
-            Button(
-                onClick = {
-                    navController.navigate(Route.AppRemoteControl)
-                },
-                modifier = Modifier.padding(top = 10.dp),
-                shape = MaterialTheme.shapes.small,
-            ) {
-                Text("Remote Control")
+                Text("Settings")
             }
         }
         

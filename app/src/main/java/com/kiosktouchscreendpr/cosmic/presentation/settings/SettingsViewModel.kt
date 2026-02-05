@@ -14,6 +14,7 @@ import com.kiosktouchscreendpr.cosmic.core.scheduler.PowerOffSchedule
 import com.kiosktouchscreendpr.cosmic.core.scheduler.PowerOnSchedule
 import com.kiosktouchscreendpr.cosmic.data.api.DeviceApi
 import com.kiosktouchscreendpr.cosmic.data.dto.RegisterDeviceRequest
+import com.kiosktouchscreendpr.cosmic.data.services.RemoteControlWebSocketClient
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -32,6 +33,7 @@ class SettingsViewModel @Inject constructor(
     private val powerOffSchedule: PowerOffSchedule,
     private val powerOnSchedule: PowerOnSchedule,
     private val deviceApi: DeviceApi,
+    private val webSocketClient: RemoteControlWebSocketClient,
     @ApplicationContext private val context: Context,
 ) : ViewModel() {
 
@@ -125,6 +127,10 @@ class SettingsViewModel @Inject constructor(
                 scheduleAlarmInternal(powerOff, powerOn)
             }
         }
+        
+        // Auto-start remote control after submit
+        startRemoteControlAfterSubmit()
+        
         _state.update { it.copy(isSuccess = true, errorMessage = null) }
     }
     
@@ -219,6 +225,36 @@ class SettingsViewModel @Inject constructor(
             e.printStackTrace()
         }
         Log.d(TAG, "🔴 END: registerRemoteDeviceAndStore()")
+    }
+    
+    /**
+     * Auto-start remote control WebSocket connection after submit
+     */
+    private fun startRemoteControlAfterSubmit() {
+        Log.d(TAG, "🚀 Auto-starting remote control...")
+        
+        val remoteId = preferences.getString(AppConstant.REMOTE_ID, null)
+        val remoteToken = preferences.getString(AppConstant.REMOTE_TOKEN, null)
+        
+        if (remoteId.isNullOrEmpty() || remoteToken.isNullOrEmpty()) {
+            Log.w(TAG, "⚠️ Cannot start remote control: REMOTE_ID or REMOTE_TOKEN missing")
+            return
+        }
+        
+        try {
+            val baseUrl = BuildConfig.WEBVIEW_BASEURL
+            // Convert http(s):// to ws(s)://
+            val wsUrl = baseUrl.replace("http://", "ws://")
+                               .replace("https://", "wss://") + "/remote-control-ws"
+            
+            Log.d(TAG, "🔌 Connecting to: $wsUrl")
+            Log.d(TAG, "🔑 Using remoteId: $remoteId, token: ${remoteToken.take(10)}...")
+            
+            webSocketClient.connect(wsUrl, remoteToken, remoteId)
+            Log.d(TAG, "✅ Remote control WebSocket started")
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Failed to start remote control: ${e.message}", e)
+        }
     }
     
     companion object {
