@@ -161,7 +161,7 @@ class RemoteControlViewModel @Inject constructor(
 
     override fun onCleared() {
         super.onCleared()
-        webSocketClient.disconnect()
+        // Connection is managed by RemoteControlService; do not disconnect here
     }
 }
 

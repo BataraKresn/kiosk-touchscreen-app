@@ -244,7 +244,7 @@ class SettingsViewModel @Inject constructor(
         try {
             // Start RemoteControlService (independent from UI lifecycle)
             val serviceIntent = android.content.Intent(context, com.kiosktouchscreendpr.cosmic.data.services.RemoteControlService::class.java)
-            context.startForegroundService(serviceIntent)
+            context.startService(serviceIntent)
             Log.d(TAG, "✅ RemoteControlService started (independent WebSocket connection)")
         } catch (e: Exception) {
             Log.e(TAG, "❌ Failed to start remote control service: ${e.message}", e)
