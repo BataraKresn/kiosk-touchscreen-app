@@ -249,43 +249,36 @@ class ScreenCaptureService : Service() {
     }
     
     /**
-     * Attempt to restart capture when ImageReader stalls
+     * Attempt to fix ImageReader stall by forcing a frame read
+     * Note: Android 14+ doesn't allow multiple createVirtualDisplay calls on same MediaProjection
      */
     private fun restartCapture() {
         try {
-            Log.e(TAG, "🔄 Releasing old resources...")
-            virtualDisplay?.release()
-            imageReader?.close()
+            Log.e(TAG, "🔄 Attempting to fix ImageReader stall...")
             
-            // Recreate ImageReader
-            imageReader = ImageReader.newInstance(
-                CAPTURE_WIDTH,
-                CAPTURE_HEIGHT,
-                PixelFormat.RGBA_8888,
-                2
-            ).apply {
-                setOnImageAvailableListener({ reader ->
-                    processFrame(reader)
-                }, handler)
+            // Try to force acquire any pending images
+            try {
+                imageReader?.acquireLatestImage()?.use { image ->
+                    Log.e(TAG, "🔄 Found stuck image in buffer, processing it...")
+                    // This will trigger processFrame naturally
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "No stuck images found: ${e.message}")
             }
             
-            // Recreate VirtualDisplay
-            virtualDisplay = mediaProjection?.createVirtualDisplay(
-                "KioskScreenCapture",
-                CAPTURE_WIDTH,
-                CAPTURE_HEIGHT,
-                SCREEN_DENSITY,
-                DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
-                imageReader?.surface,
-                null,
-                handler
-            )
-            
-            frameCount = 0
-            lastFrameReceivedTime = System.currentTimeMillis()
-            Log.e(TAG, "✅ Capture restarted successfully")
+            // If still stalled, only option is to stop and let user restart manually
+            val timeSinceLastFrame = System.currentTimeMillis() - lastFrameReceivedTime
+            if (timeSinceLastFrame > FRAME_TIMEOUT_MS + 3000) {
+                Log.e(TAG, "❌ ImageReader permanently stalled. Service will stop.")
+                Log.e(TAG, "💡 User needs to restart screen capture manually")
+                stopSelf()
+            } else {
+                Log.e(TAG, "⏳ Giving ImageReader more time to recover...")
+                lastFrameReceivedTime = System.currentTimeMillis() - 3000 // Give 3s grace period
+            }
         } catch (e: Exception) {
-            Log.e(TAG, "❌ Failed to restart capture: ${e.message}", e)
+            Log.e(TAG, "❌ Failed to fix stall: ${e.message}", e)
+            stopSelf()
         }
     }
 
