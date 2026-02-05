@@ -49,6 +49,12 @@
 
         <!-- Remote Control Services -->
         <service
+            android:name=".data.services.RemoteControlService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="specialUse" />
+
+        <service
             android:name=".data.services.ScreenCaptureService"
             android:enabled="true"
             android:exported="false"

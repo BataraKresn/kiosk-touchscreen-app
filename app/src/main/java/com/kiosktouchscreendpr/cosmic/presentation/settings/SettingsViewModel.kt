@@ -231,7 +231,7 @@ class SettingsViewModel @Inject constructor(
      * Auto-start remote control WebSocket connection after submit
      */
     private fun startRemoteControlAfterSubmit() {
-        Log.d(TAG, "🚀 Auto-starting remote control...")
+        Log.d(TAG, "🚀 Auto-starting remote control service...")
         
         val remoteId = preferences.getString(AppConstant.REMOTE_ID, null)
         val remoteToken = preferences.getString(AppConstant.REMOTE_TOKEN, null)
@@ -242,18 +242,12 @@ class SettingsViewModel @Inject constructor(
         }
         
         try {
-            val baseUrl = BuildConfig.WEBVIEW_BASEURL
-            // Convert http(s):// to ws(s)://
-            val wsUrl = baseUrl.replace("http://", "ws://")
-                               .replace("https://", "wss://") + "/remote-control-ws"
-            
-            Log.d(TAG, "🔌 Connecting to: $wsUrl")
-            Log.d(TAG, "🔑 Using remoteId: $remoteId, token: ${remoteToken.take(10)}...")
-            
-            webSocketClient.connect(wsUrl, remoteToken, remoteId)
-            Log.d(TAG, "✅ Remote control WebSocket started")
+            // Start RemoteControlService (independent from UI lifecycle)
+            val serviceIntent = android.content.Intent(context, com.kiosktouchscreendpr.cosmic.data.services.RemoteControlService::class.java)
+            context.startForegroundService(serviceIntent)
+            Log.d(TAG, "✅ RemoteControlService started (independent WebSocket connection)")
         } catch (e: Exception) {
-            Log.e(TAG, "❌ Failed to start remote control: ${e.message}", e)
+            Log.e(TAG, "❌ Failed to start remote control service: ${e.message}", e)
         }
     }
     
