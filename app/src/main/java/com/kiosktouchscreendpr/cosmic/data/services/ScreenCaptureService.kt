@@ -125,12 +125,16 @@ class ScreenCaptureService : Service() {
         
         Log.e(TAG, "📦 Checking companion object - mediaProjectionResultCode: $mediaProjectionResultCode, mediaProjectionData: $mediaProjectionData")
         
-        if (mediaProjectionResultCode >= 0 && mediaProjectionData != null) {
+        // RESULT_OK is -1, so check explicitly for that value
+        if (mediaProjectionResultCode == Activity.RESULT_OK && mediaProjectionData != null) {
             resultCode = mediaProjectionResultCode
             data = mediaProjectionData
-            Log.e(TAG, "✅ Retrieved MediaProjection data from companion object!")
-            Log.e(TAG, "   resultCode: $resultCode")
+            Log.e(TAG, "✅✅✅ Retrieved MediaProjection data from companion object!")
+            Log.e(TAG, "   resultCode: $resultCode (RESULT_OK)")
             Log.e(TAG, "   data: $data")
+            // Clear after retrieval
+            mediaProjectionResultCode = 0
+            mediaProjectionData = null
         } else {
             Log.e(TAG, "⚠️ No stored MediaProjection data in companion object - trying Intent extras as fallback")
             intent?.let {
@@ -164,6 +168,16 @@ class ScreenCaptureService : Service() {
             val projectionManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
             mediaProjection = projectionManager.getMediaProjection(resultCode, data)
             
+            // Android 14+ requires callback registration before createVirtualDisplay
+            mediaProjection?.registerCallback(object : MediaProjection.Callback() {
+                override fun onStop() {
+                    Log.e(TAG, "⚠️ MediaProjection stopped")
+                    stopSelf()
+                }
+            }, handler)
+            
+            Log.e(TAG, "✅ MediaProjection callback registered")
+            
             // Setup ImageReader for frame capture
             imageReader = ImageReader.newInstance(
                 CAPTURE_WIDTH,
@@ -175,6 +189,8 @@ class ScreenCaptureService : Service() {
                     processFrame(reader)
                 }, handler)
             }
+            
+            Log.e(TAG, "✅ ImageReader created")
             
             // Create virtual display
             virtualDisplay = mediaProjection?.createVirtualDisplay(
@@ -188,10 +204,10 @@ class ScreenCaptureService : Service() {
                 handler
             )
             
-            Log.d(TAG, "Screen capture started successfully")
+            Log.e(TAG, "✅✅✅ Screen capture started successfully!")
             
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to start screen capture", e)
+            Log.e(TAG, "❌ Failed to start screen capture", e)
             stopSelf()
         }
     }
