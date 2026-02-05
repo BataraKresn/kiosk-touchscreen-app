@@ -13,6 +13,7 @@ import com.kiosktouchscreendpr.cosmic.app.App
 import com.kiosktouchscreendpr.cosmic.core.apprequest.AppRequest
 import com.kiosktouchscreendpr.cosmic.core.utils.NetworkObserver
 import com.kiosktouchscreendpr.cosmic.core.utils.WakeService
+import com.kiosktouchscreendpr.cosmic.data.services.RemoteControlService
 import com.kiosktouchscreendpr.cosmic.core.utils.setupLegacySystemUI
 import com.kiosktouchscreendpr.cosmic.core.utils.setupModernSystemUI
 import dagger.hilt.android.AndroidEntryPoint
@@ -83,6 +84,7 @@ class MainActivity : ComponentActivity() {
             3 -> {
                 // All permissions handled — proceed to start service or initialize app
                 startForegroundService(Intent(this, WakeService::class.java))
+                startService(Intent(this, RemoteControlService::class.java))
                 permissionStep = 4
             }
         }
