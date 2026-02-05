@@ -14,7 +14,6 @@ import com.kiosktouchscreendpr.cosmic.core.scheduler.PowerOffSchedule
 import com.kiosktouchscreendpr.cosmic.core.scheduler.PowerOnSchedule
 import com.kiosktouchscreendpr.cosmic.data.api.DeviceApi
 import com.kiosktouchscreendpr.cosmic.data.dto.RegisterDeviceRequest
-import com.kiosktouchscreendpr.cosmic.data.services.RemoteControlWebSocketClient
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -33,7 +32,6 @@ class SettingsViewModel @Inject constructor(
     private val powerOffSchedule: PowerOffSchedule,
     private val powerOnSchedule: PowerOnSchedule,
     private val deviceApi: DeviceApi,
-    private val webSocketClient: RemoteControlWebSocketClient,
     @ApplicationContext private val context: Context,
 ) : ViewModel() {
 
