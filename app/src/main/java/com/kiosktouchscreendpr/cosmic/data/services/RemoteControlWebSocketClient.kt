@@ -75,6 +75,10 @@ class RemoteControlWebSocketClient @Inject constructor(
     // Connection state flow
     private val _connectionState = MutableStateFlow(ConnectionState.DISCONNECTED)
     val connectionState: StateFlow<ConnectionState> = _connectionState.asStateFlow()
+
+    // Auth events flow
+    private val _authEvents = MutableSharedFlow<AuthEvent>(extraBufferCapacity = 4)
+    val authEvents: SharedFlow<AuthEvent> = _authEvents.asSharedFlow()
     
     // Last heartbeat response time
     private var lastHeartbeatResponse = 0L
@@ -94,6 +98,10 @@ class RemoteControlWebSocketClient @Inject constructor(
         CONNECTED,
         RECONNECTING,
         ERROR
+    }
+
+    sealed class AuthEvent {
+        data class AuthFailed(val reason: String) : AuthEvent()
     }
 
     /**
@@ -237,6 +245,7 @@ class RemoteControlWebSocketClient @Inject constructor(
                     val messageText = json.optString("message", json.optString("reason", "Unknown error"))
                     Log.e(TAG, "❌ Authentication failed: $messageText")
                     isAuthenticated = false
+                    _authEvents.tryEmit(AuthEvent.AuthFailed(messageText))
                     disconnect()
                 }
                 

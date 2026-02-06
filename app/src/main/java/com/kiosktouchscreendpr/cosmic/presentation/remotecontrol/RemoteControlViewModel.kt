@@ -4,9 +4,13 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.media.projection.MediaProjectionManager
+import android.provider.Settings
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.kiosktouchscreendpr.cosmic.BuildConfig
+import com.kiosktouchscreendpr.cosmic.core.constant.AppConstant
+import com.kiosktouchscreendpr.cosmic.data.api.DeviceApi
 import com.kiosktouchscreendpr.cosmic.data.services.AdaptiveQualityController
 import com.kiosktouchscreendpr.cosmic.data.services.ConnectionHealthMonitor
 import com.kiosktouchscreendpr.cosmic.data.services.InputInjectionService
@@ -14,12 +18,14 @@ import com.kiosktouchscreendpr.cosmic.data.services.MetricsReporter
 import com.kiosktouchscreendpr.cosmic.data.services.RemoteControlWebSocketClient
 import com.kiosktouchscreendpr.cosmic.data.services.ScreenCaptureService
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import android.content.SharedPreferences
 import javax.inject.Inject
 
 /**
@@ -37,7 +43,10 @@ class RemoteControlViewModel @Inject constructor(
     private val webSocketClient: RemoteControlWebSocketClient,
     private val adaptiveQuality: AdaptiveQualityController,
     private val healthMonitor: ConnectionHealthMonitor,
-    private val metricsReporter: MetricsReporter
+    private val metricsReporter: MetricsReporter,
+    private val deviceApi: DeviceApi,
+    private val preferences: SharedPreferences,
+    @ApplicationContext private val appContext: Context
 ) : ViewModel() {
 
     private val _remoteControlState = MutableStateFlow<RemoteControlState>(RemoteControlState.Idle)
@@ -60,6 +69,87 @@ class RemoteControlViewModel @Inject constructor(
     private var currentDeviceId: String = ""
     private var currentSessionId: String = ""
     private var metricsReportingJob: kotlinx.coroutines.Job? = null
+    private var lastRelayServerUrl: String? = null
+    private var lastAuthToken: String? = null
+    private var tokenRefreshInProgress = false
+    private var tokenRefreshAttempts = 0
+    private val maxTokenRefreshAttempts = 3
+
+    init {
+        viewModelScope.launch {
+            webSocketClient.authEvents.collect { event ->
+                when (event) {
+                    is RemoteControlWebSocketClient.AuthEvent.AuthFailed -> {
+                        Log.e("RemoteControlVM", "⚠️ Auth failed from relay: ${event.reason}")
+                        refreshRemoteTokenAndReconnect()
+                    }
+                }
+            }
+        }
+    }
+
+    private fun refreshRemoteTokenAndReconnect() {
+        if (tokenRefreshInProgress) return
+        if (tokenRefreshAttempts >= maxTokenRefreshAttempts) {
+            Log.e("RemoteControlVM", "❌ Max token refresh attempts reached. Skipping refresh.")
+            return
+        }
+
+        val relayUrl = lastRelayServerUrl
+        if (relayUrl.isNullOrBlank()) {
+            Log.w("RemoteControlVM", "⚠️ Missing relay URL, cannot refresh token")
+            return
+        }
+
+        tokenRefreshInProgress = true
+        tokenRefreshAttempts += 1
+
+        viewModelScope.launch {
+            try {
+                Log.e("RemoteControlVM", "🔄 Refreshing remote token from CMS (attempt $tokenRefreshAttempts/$maxTokenRefreshAttempts)")
+
+                val androidId = preferences.getString(AppConstant.DEVICE_ID, null)
+                    ?: Settings.Secure.getString(appContext.contentResolver, Settings.Secure.ANDROID_ID)
+                    ?: ""
+
+                val deviceName = "${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}"
+                val response = deviceApi.registerRemoteDevice(
+                    baseUrl = BuildConfig.WEBVIEW_BASEURL,
+                    deviceId = androidId,
+                    deviceName = deviceName,
+                    appVersion = BuildConfig.VERSION_NAME
+                )
+
+                if (response?.success == true) {
+                    val newRemoteId = response.data.remoteId.toString()
+                    val newToken = response.data.token
+
+                    preferences.edit().apply {
+                        putString(AppConstant.DEVICE_ID, androidId)
+                        putString(AppConstant.REMOTE_ID, newRemoteId)
+                        putString(AppConstant.REMOTE_TOKEN, newToken)
+                        apply()
+                    }
+
+                    currentDeviceId = newRemoteId
+                    lastAuthToken = newToken
+
+                    Log.e("RemoteControlVM", "✅ Token refreshed. Reconnecting with new token...")
+                    webSocketClient.connect(
+                        wsUrl = relayUrl,
+                        token = newToken,
+                        devId = newRemoteId
+                    )
+                } else {
+                    Log.e("RemoteControlVM", "❌ Token refresh failed (null/unsuccessful response)")
+                }
+            } catch (e: Exception) {
+                Log.e("RemoteControlVM", "❌ Token refresh error: ${e.message}", e)
+            } finally {
+                tokenRefreshInProgress = false
+            }
+        }
+    }
 
     /**
      * Start remote control session with adaptive quality monitoring
@@ -81,6 +171,8 @@ class RemoteControlViewModel @Inject constructor(
                 // Store device info for metrics
                 currentDeviceId = deviceId
                 currentSessionId = java.util.UUID.randomUUID().toString()
+                lastRelayServerUrl = relayServerUrl
+                lastAuthToken = authToken
                 
                 // Initialize metrics reporter if backend API provided
                 if (backendApiUrl != null) {

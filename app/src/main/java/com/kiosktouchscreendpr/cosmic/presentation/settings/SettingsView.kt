@@ -165,13 +165,13 @@ fun SettingsRoot(
     // Separate LaunchedEffect for navigation - only navigate when permission result comes back
     LaunchedEffect(shouldNavigateHome) {
         if (shouldNavigateHome) {
-            android.util.Log.e("SettingsView", "🏠🏠🏠 Permission result received - Navigating back to AppHome...")
+            android.util.Log.e("SettingsView", "📱📱📱 Permission result received - Navigating to Home screen...")
             navController.navigate(Route.AppHome) {
                 popUpTo(Route.AppSettings) {
                     inclusive = true
                 }
             }
-            android.util.Log.e("SettingsView", "✅ Navigation completed")
+            android.util.Log.e("SettingsView", "✅ Navigation to Home completed")
         }
     }
 
