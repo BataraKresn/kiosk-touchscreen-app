@@ -92,13 +92,16 @@ class ScreenCaptureService : Service() {
     
     override fun onCreate() {
         super.onCreate()
-        Log.d(TAG, "ScreenCaptureService created")
+        Log.e(TAG, "📹📹📹 ScreenCaptureService onCreate() called!")
+        Log.e(TAG, "🔧 Creating notification channel...")
         
         // Create notification channel
         createNotificationChannel()
         
+        Log.e(TAG, "🎯 Starting foreground service...")
         // Start foreground service
         startForeground(NOTIFICATION_ID, createNotification())
+        Log.e(TAG, "✅ ScreenCaptureService onCreate() completed!")
         
         // Setup background handler
         handlerThread = HandlerThread("ScreenCaptureThread").apply {
@@ -108,21 +111,28 @@ class ScreenCaptureService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        Log.d(TAG, "onStartCommand")
+        Log.e(TAG, "📹📹📹 onStartCommand called!")
+        Log.e(TAG, "📦 Intent: $intent")
         
         intent?.let {
             val resultCode = it.getIntExtra("resultCode", -1)
+            Log.e(TAG, "📊 resultCode: $resultCode")
+            
             val data = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 it.getParcelableExtra("data", Intent::class.java)
             } else {
                 @Suppress("DEPRECATION")
                 it.getParcelableExtra<Intent>("data")
             }
+            Log.e(TAG, "📦 MediaProjection data: $data")
             
             if (resultCode != -1 && data != null) {
+                Log.e(TAG, "🎬🎬🎬 Starting screen capture with resultCode=$resultCode")
                 startCapture(resultCode, data)
+            } else {
+                Log.e(TAG, "❌ Cannot start capture - resultCode: $resultCode, data: $data")
             }
-        }
+        } ?: Log.e(TAG, "⚠️ Intent is NULL!")
         
         return START_STICKY
     }
@@ -133,7 +143,7 @@ class ScreenCaptureService : Service() {
      * Start screen capture with MediaProjection
      */
     private fun startCapture(resultCode: Int, data: Intent) {
-        Log.d(TAG, "Starting screen capture")
+        Log.e(TAG, "🚀🚀🚀 startCapture() called - resultCode: $resultCode, data: $data")
         
         try {
             val projectionManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
@@ -195,10 +205,13 @@ class ScreenCaptureService : Service() {
                 // Send to WebSocket client (primary path)
                 if (::webSocketClient.isInitialized) {
                     webSocketClient.queueFrame(jpegBytes)
+                    Log.d(TAG, "📤 Frame queued to WebSocket: ${jpegBytes.size / 1024}KB")
+                } else {
+                    Log.e(TAG, "❌ webSocketClient NOT initialized!")
                 }
                 
                 // Log frame stats (remove in production)
-                Log.v(TAG, "Frame captured: ${jpegBytes.size / 1024}KB")
+                Log.v(TAG, "📸 Frame captured: ${jpegBytes.size / 1024}KB")
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error processing frame", e)

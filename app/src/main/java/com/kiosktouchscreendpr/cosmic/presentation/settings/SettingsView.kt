@@ -82,7 +82,8 @@ fun SettingsRoot(
     val screenCaptureLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
-        android.util.Log.e("SettingsView", "🎥 Screen capture result: ${result.resultCode} (RESULT_OK=${Activity.RESULT_OK})")
+        android.util.Log.e("SettingsView", "🎥🎥🎥 Screen capture result: ${result.resultCode} (RESULT_OK=${Activity.RESULT_OK})")
+        android.util.Log.e("SettingsView", "📦 Result data: ${result.data}")
         if (result.resultCode == Activity.RESULT_OK) {
             val deviceId = prefs.getString(AppConstant.REMOTE_ID, "") ?: ""
             val deviceToken = prefs.getString(AppConstant.REMOTE_TOKEN, "") ?: ""
@@ -95,11 +96,13 @@ fun SettingsRoot(
                     authToken = deviceToken,
                     relayServerUrl = relayServerUrl
                 )
+                android.util.Log.e("SettingsView", "📹📹📹 Calling onScreenCapturePermissionGranted with resultCode=${result.resultCode}, data=${result.data}")
                 remoteControlViewModel.onScreenCapturePermissionGranted(
                     context = context,
                     resultCode = result.resultCode,
                     data = result.data
                 )
+                android.util.Log.e("SettingsView", "✅ onScreenCapturePermissionGranted called")
             } else {
                 android.util.Log.e("SettingsView", "Device not registered - missing ID or Token")
                 Toast.makeText(

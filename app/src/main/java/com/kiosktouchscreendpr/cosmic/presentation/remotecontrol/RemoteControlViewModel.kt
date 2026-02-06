@@ -95,22 +95,34 @@ class RemoteControlViewModel @Inject constructor(
      * Handle screen capture permission result
      */
     fun onScreenCapturePermissionGranted(context: Context, resultCode: Int, data: Intent?) {
+        Log.e("RemoteControlVM", "📹📹📹 onScreenCapturePermissionGranted called - resultCode: $resultCode, data: $data, RESULT_OK: ${Activity.RESULT_OK}")
         viewModelScope.launch {
-            if (resultCode == Activity.RESULT_OK && data != null) {
+            if (resultCode == Activity.RESULT_OK) {
+                if (data == null) {
+                    Log.e("RemoteControlVM", "⚠️⚠️⚠️ WARNING: data is NULL but resultCode is OK! This should not happen!")
+                    _remoteControlState.value = RemoteControlState.Error("Screen capture data is null")
+                    return@launch
+                }
+                
                 try {
+                    Log.e("RemoteControlVM", "⏳ Waiting 500ms for WebSocket to establish...")
                     // Wait a bit for WebSocket to establish
                     delay(500)
                     
+                    Log.e("RemoteControlVM", "🎬🎬🎬 Starting ScreenCaptureService NOW!")
                     // Start ScreenCaptureService
                     val intent = Intent(context, ScreenCaptureService::class.java).apply {
                         putExtra("resultCode", resultCode)
                         putExtra("data", data)
                     }
                     context.startForegroundService(intent)
+                    Log.e("RemoteControlVM", "✅✅✅ ScreenCaptureService.startForegroundService() called successfully!")
                 } catch (e: Exception) {
+                    Log.e("RemoteControlVM", "❌❌❌ Failed to start ScreenCaptureService", e)
                     _remoteControlState.value = RemoteControlState.Error("Failed to start screen capture: ${e.message}")
                 }
             } else {
+                Log.e("RemoteControlVM", "❌ Screen capture permission DENIED - resultCode: $resultCode")
                 _remoteControlState.value = RemoteControlState.Error("Screen capture permission denied")
                 _connectionStatus.value = ConnectionStatus.Disconnected
             }
