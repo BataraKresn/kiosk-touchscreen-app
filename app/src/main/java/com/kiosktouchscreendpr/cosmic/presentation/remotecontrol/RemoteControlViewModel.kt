@@ -46,6 +46,7 @@ class RemoteControlViewModel @Inject constructor(
     private val metricsReporter: MetricsReporter,
     private val deviceApi: DeviceApi,
     private val preferences: SharedPreferences,
+    private val appScope: kotlinx.coroutines.CoroutineScope,
     @ApplicationContext private val appContext: Context
 ) : ViewModel() {
 
@@ -95,7 +96,7 @@ class RemoteControlViewModel @Inject constructor(
             return
         }
 
-        val relayUrl = lastRelayServerUrl
+        val relayUrl = lastRelayServerUrl ?: buildRelayUrlFallback()
         if (relayUrl.isNullOrBlank()) {
             Log.w("RemoteControlVM", "⚠️ Missing relay URL, cannot refresh token")
             return
@@ -104,7 +105,7 @@ class RemoteControlViewModel @Inject constructor(
         tokenRefreshInProgress = true
         tokenRefreshAttempts += 1
 
-        viewModelScope.launch {
+        appScope.launch {
             try {
                 Log.e("RemoteControlVM", "🔄 Refreshing remote token from CMS (attempt $tokenRefreshAttempts/$maxTokenRefreshAttempts)")
 
@@ -149,6 +150,11 @@ class RemoteControlViewModel @Inject constructor(
                 tokenRefreshInProgress = false
             }
         }
+    }
+
+    private fun buildRelayUrlFallback(): String {
+        val baseUrl = BuildConfig.WEBVIEW_BASEURL.takeIf { it.isNotBlank() } ?: "https://kiosk.mugshot.dev"
+        return baseUrl.replace("https://", "wss://").replace("http://", "ws://") + "/remote-control-ws"
     }
 
     /**

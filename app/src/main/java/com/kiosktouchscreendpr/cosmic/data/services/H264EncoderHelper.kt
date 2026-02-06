@@ -38,7 +38,7 @@ class H264EncoderHelper(
         private const val LEVEL_3_1 = 13
         
         // Color format
-        private const val COLOR_FORMAT = MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420SemiPlanar
+        private const val COLOR_FORMAT = MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible
         
         // Keyframe interval
         private const val I_FRAME_INTERVAL = 2  // 2 seconds between keyframes
