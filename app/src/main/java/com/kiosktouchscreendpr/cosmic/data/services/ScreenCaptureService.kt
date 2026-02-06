@@ -1,5 +1,6 @@
 package com.kiosktouchscreendpr.cosmic.data.services
 
+import android.app.Activity
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -126,11 +127,12 @@ class ScreenCaptureService : Service() {
             }
             Log.e(TAG, "📦 MediaProjection data: $data")
             
-            if (resultCode != -1 && data != null) {
+            // Activity.RESULT_OK = -1, so we check if resultCode equals RESULT_OK (not "!= -1")
+            if (resultCode == Activity.RESULT_OK && data != null) {
                 Log.e(TAG, "🎬🎬🎬 Starting screen capture with resultCode=$resultCode")
                 startCapture(resultCode, data)
             } else {
-                Log.e(TAG, "❌ Cannot start capture - resultCode: $resultCode, data: $data")
+                Log.e(TAG, "❌ Cannot start capture - resultCode: $resultCode (expected: ${Activity.RESULT_OK}), data: $data")
             }
         } ?: Log.e(TAG, "⚠️ Intent is NULL!")
         
