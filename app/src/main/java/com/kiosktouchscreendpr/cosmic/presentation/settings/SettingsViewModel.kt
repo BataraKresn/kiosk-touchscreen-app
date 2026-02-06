@@ -104,6 +104,7 @@ class SettingsViewModel @Inject constructor(
     }
 
     private fun onSubmit() = viewModelScope.launch {
+        Log.e(TAG, "🔵🔵🔵 onSubmit() started")
         // Save to SharedPreferences
         preferences.edit().apply {
             putString(AppConstant.TOKEN, _state.value.token)
@@ -112,12 +113,15 @@ class SettingsViewModel @Inject constructor(
             putString(AppConstant.POWER_ON, formatTime(_state.value.powerOnTime))
             apply()
         }
+        Log.e(TAG, "✅ Preferences saved")
 
         // Register display to backend (optional, non-blocking)
         registerDisplayToken(_state.value.token)
+        Log.e(TAG, "✅ Display token registered")
 
         // Register device to remote-control backend (required for relay auth)
         registerRemoteDeviceAndStore()
+        Log.e(TAG, "✅ Remote device registered")
 
         // Schedule alarms
         _state.value.powerOffTime?.let { powerOff ->
@@ -125,11 +129,15 @@ class SettingsViewModel @Inject constructor(
                 scheduleAlarmInternal(powerOff, powerOn)
             }
         }
+        Log.e(TAG, "✅ Alarms scheduled")
         
         // Auto-start remote control after submit
         startRemoteControlAfterSubmit()
+        Log.e(TAG, "✅ startRemoteControlAfterSubmit() completed")
         
+        Log.e(TAG, "🚀🚀🚀 Setting isSuccess = true")
         _state.update { it.copy(isSuccess = true, errorMessage = null) }
+        Log.e(TAG, "✅ State updated - isSuccess should now be true")
     }
     
     /**
@@ -229,10 +237,12 @@ class SettingsViewModel @Inject constructor(
      * Auto-start remote control WebSocket connection after submit
      */
     private fun startRemoteControlAfterSubmit() {
-        Log.d(TAG, "🚀 Auto-starting remote control service...")
+        Log.e(TAG, "🚀 Auto-starting remote control service...")
         
         val remoteId = preferences.getString(AppConstant.REMOTE_ID, null)
         val remoteToken = preferences.getString(AppConstant.REMOTE_TOKEN, null)
+        Log.e(TAG, "   remoteId: $remoteId")
+        Log.e(TAG, "   remoteToken: $remoteToken")
         
         if (remoteId.isNullOrEmpty() || remoteToken.isNullOrEmpty()) {
             Log.w(TAG, "⚠️ Cannot start remote control: REMOTE_ID or REMOTE_TOKEN missing")
@@ -243,7 +253,7 @@ class SettingsViewModel @Inject constructor(
             // Start RemoteControlService (independent from UI lifecycle)
             val serviceIntent = android.content.Intent(context, com.kiosktouchscreendpr.cosmic.data.services.RemoteControlService::class.java)
             context.startService(serviceIntent)
-            Log.d(TAG, "✅ RemoteControlService started (independent WebSocket connection)")
+            Log.e(TAG, "✅ RemoteControlService started (independent WebSocket connection)")
         } catch (e: Exception) {
             Log.e(TAG, "❌ Failed to start remote control service: ${e.message}", e)
         }

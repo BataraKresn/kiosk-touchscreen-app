@@ -134,23 +134,31 @@ fun SettingsRoot(
                 val deviceToken = prefs.getString(AppConstant.REMOTE_TOKEN, "") ?: ""
                 android.util.Log.e("SettingsView", "📱 Stored prefs - ID: $deviceId, Token: $deviceToken")
                 if (deviceId.isNotEmpty() && deviceToken.isNotEmpty()) {
+                    android.util.Log.e("SettingsView", "🎬 Creating MediaProjectionManager...")
                     val manager = context.getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
-                    android.util.Log.e("SettingsView", "🚀 Launching screen capture intent")
-                    screenCaptureLauncher.launch(manager.createScreenCaptureIntent())
+                    val intent = manager.createScreenCaptureIntent()
+                    android.util.Log.e("SettingsView", "📺 createScreenCaptureIntent() returned: $intent")
+                    android.util.Log.e("SettingsView", "🚀🚀🚀 LAUNCHING screenCaptureLauncher NOW 🚀🚀🚀")
+                    screenCaptureLauncher.launch(intent)
+                    android.util.Log.e("SettingsView", "✅ screenCaptureLauncher.launch() called")
                 } else {
-                    android.util.Log.e("SettingsView", "❌ Cannot start remote - prefs empty")
+                    android.util.Log.e("SettingsView", "❌ Cannot start remote - prefs empty (ID: '$deviceId', Token: '$deviceToken')")
                     Toast.makeText(
                         context,
                         "Remote Control belum terdaftar. Coba submit ulang.",
                         Toast.LENGTH_SHORT
                     ).show()
                 }
+            } else {
+                android.util.Log.e("SettingsView", "⚠️ autoStartRequested already true, skipping screen capture launch")
             }
+            android.util.Log.e("SettingsView", "🏠 Navigating back to AppHome...")
             navController.navigate(Route.AppHome) {
                 popUpTo(Route.AppSettings) {
                     inclusive = true
                 }
             }
+            android.util.Log.e("SettingsView", "✅ Navigation completed")
         }
     }
 
