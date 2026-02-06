@@ -53,6 +53,7 @@ class RemoteControlWebSocketClient @Inject constructor(
     // Connection state
     private var session: WebSocketSession? = null
     private var isConnected = false
+    private var isAuthenticated = false
     private var reconnectDelay = INITIAL_RECONNECT_DELAY_MS
     
     // Coroutine scope
@@ -143,9 +144,6 @@ class RemoteControlWebSocketClient @Inject constructor(
             // Send authentication message
             sendAuthenticationMessage()
             
-            // Start heartbeat
-            startHeartbeat()
-            
             // Handle incoming messages
             try {
                 for (frame in incoming) {
@@ -225,6 +223,8 @@ class RemoteControlWebSocketClient @Inject constructor(
                 
                 "auth_success" -> {
                     Log.d(TAG, "Authentication successful")
+                    isAuthenticated = true
+                    startHeartbeat()
                 }
                 
                 "error" -> {
@@ -235,6 +235,7 @@ class RemoteControlWebSocketClient @Inject constructor(
                 "auth_failed" -> {
                     val reason = json.optString("reason", "Unknown")
                     Log.e(TAG, "Authentication failed: $reason")
+                    isAuthenticated = false
                     disconnect()
                 }
                 
@@ -339,7 +340,7 @@ class RemoteControlWebSocketClient @Inject constructor(
         frameProcessingJob = scope.launch {
             frameQueue.collect { frameBytes ->
                 try {
-                    if (isConnected && session != null) {
+                    if (isConnected && isAuthenticated && session != null) {
                         // Encode frame as base64 for JSON transmission
                         // Note: For production, use binary frames or dedicated protocol
                         val base64Frame = Base64.getEncoder().encodeToString(frameBytes)
@@ -391,6 +392,7 @@ class RemoteControlWebSocketClient @Inject constructor(
         heartbeatJob?.cancel()
         session = null
         isConnected = false
+        isAuthenticated = false
         _connectionState.value = ConnectionState.DISCONNECTED
         
         Log.d(TAG, "WebSocket connection cleaned up")

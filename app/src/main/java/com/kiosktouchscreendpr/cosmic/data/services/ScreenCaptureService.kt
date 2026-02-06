@@ -23,6 +23,8 @@ import android.os.HandlerThread
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 
@@ -46,6 +48,7 @@ import java.nio.ByteBuffer
  * @author Cosmic Development Team
  * @version 1.0.0 (POC)
  */
+@AndroidEntryPoint
 class ScreenCaptureService : Service() {
 
     companion object {
@@ -80,6 +83,9 @@ class ScreenCaptureService : Service() {
     
     // Frame callback listener
     private var frameCallback: ((ByteArray) -> Unit)? = null
+
+    @Inject
+    lateinit var webSocketClient: RemoteControlWebSocketClient
     
     // Frame rate control
     private var lastFrameTime = 0L
@@ -183,8 +189,13 @@ class ScreenCaptureService : Service() {
                 // Convert to JPEG
                 val jpegBytes = encodeToJPEG(image)
                 
-                // Send to callback (WebSocket will handle transmission)
+                // Send to callback (if set)
                 frameCallback?.invoke(jpegBytes)
+
+                // Send to WebSocket client (primary path)
+                if (::webSocketClient.isInitialized) {
+                    webSocketClient.queueFrame(jpegBytes)
+                }
                 
                 // Log frame stats (remove in production)
                 Log.v(TAG, "Frame captured: ${jpegBytes.size / 1024}KB")
