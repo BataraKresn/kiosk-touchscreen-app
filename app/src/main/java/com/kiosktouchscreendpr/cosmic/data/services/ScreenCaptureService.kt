@@ -69,6 +69,9 @@ class ScreenCaptureService : Service() {
         // MJPEG Quality (0-100)
         private const val JPEG_QUALITY = 75
         
+        // Frame watchdog
+        private const val FRAME_TIMEOUT_MS = 5000L // 5 seconds without frames = problem
+        
         // Action for callback
         const val ACTION_FRAME_AVAILABLE = "com.kiosktouchscreendpr.cosmic.FRAME_AVAILABLE"
         
@@ -93,8 +96,11 @@ class ScreenCaptureService : Service() {
     @Inject
     lateinit var webSocketClient: RemoteControlWebSocketClient
     
-    // Frame rate control
+    // Frame rate control and watchdog
     private var lastFrameTime = 0L
+    private var lastFrameReceivedTime = 0L
+    private var frameCount = 0L
+    private var watchdogRunnable: Runnable? = null
     
     override fun onCreate() {
         super.onCreate()
@@ -206,9 +212,80 @@ class ScreenCaptureService : Service() {
             
             Log.e(TAG, "✅✅✅ Screen capture started successfully!")
             
+            // Start watchdog timer to detect ImageReader stalls
+            startFrameWatchdog()
+            
         } catch (e: Exception) {
             Log.e(TAG, "❌ Failed to start screen capture", e)
             stopSelf()
+        }
+    }
+    
+    /**
+     * Start watchdog timer to detect when ImageReader stops producing frames
+     */
+    private fun startFrameWatchdog() {
+        lastFrameReceivedTime = System.currentTimeMillis()
+        watchdogRunnable = object : Runnable {
+            override fun run() {
+                val timeSinceLastFrame = System.currentTimeMillis() - lastFrameReceivedTime
+                if (timeSinceLastFrame > FRAME_TIMEOUT_MS && frameCount > 0) {
+                    Log.e(TAG, "🚨🚨🚨 FRAME TIMEOUT! No frames for ${timeSinceLastFrame}ms (Total frames: $frameCount)")
+                    Log.e(TAG, "🔍 MediaProjection: ${mediaProjection != null}, VirtualDisplay: ${virtualDisplay != null}, ImageReader: ${imageReader != null}")
+                    
+                    // Try to restart capture
+                    Log.e(TAG, "🔄 Attempting to restart capture...")
+                    restartCapture()
+                } else if (frameCount > 0) {
+                    Log.d(TAG, "🐕 Watchdog: ${timeSinceLastFrame}ms since last frame (Total: $frameCount frames)")
+                }
+                
+                // Schedule next check
+                handler?.postDelayed(this, FRAME_TIMEOUT_MS)
+            }
+        }
+        handler?.postDelayed(watchdogRunnable!!, FRAME_TIMEOUT_MS)
+        Log.e(TAG, "🐕 Frame watchdog started")
+    }
+    
+    /**
+     * Attempt to restart capture when ImageReader stalls
+     */
+    private fun restartCapture() {
+        try {
+            Log.e(TAG, "🔄 Releasing old resources...")
+            virtualDisplay?.release()
+            imageReader?.close()
+            
+            // Recreate ImageReader
+            imageReader = ImageReader.newInstance(
+                CAPTURE_WIDTH,
+                CAPTURE_HEIGHT,
+                PixelFormat.RGBA_8888,
+                2
+            ).apply {
+                setOnImageAvailableListener({ reader ->
+                    processFrame(reader)
+                }, handler)
+            }
+            
+            // Recreate VirtualDisplay
+            virtualDisplay = mediaProjection?.createVirtualDisplay(
+                "KioskScreenCapture",
+                CAPTURE_WIDTH,
+                CAPTURE_HEIGHT,
+                SCREEN_DENSITY,
+                DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
+                imageReader?.surface,
+                null,
+                handler
+            )
+            
+            frameCount = 0
+            lastFrameReceivedTime = System.currentTimeMillis()
+            Log.e(TAG, "✅ Capture restarted successfully")
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Failed to restart capture: ${e.message}", e)
         }
     }
 
@@ -216,6 +293,10 @@ class ScreenCaptureService : Service() {
      * Process captured frame
      */
     private fun processFrame(reader: ImageReader) {
+        // Update watchdog
+        lastFrameReceivedTime = System.currentTimeMillis()
+        frameCount++
+        
         // Frame rate control
         val currentTime = System.currentTimeMillis()
         if (currentTime - lastFrameTime < FRAME_INTERVAL_MS) {
@@ -226,28 +307,49 @@ class ScreenCaptureService : Service() {
         var image: Image? = null
         try {
             image = reader.acquireLatestImage()
-            if (image != null) {
-                // Convert to JPEG
-                val jpegBytes = encodeToJPEG(image)
-                
-                // Send to callback (if set)
+            if (image == null) {
+                Log.w(TAG, "⚠️ acquireLatestImage() returned null - ImageReader may be stalled")
+                return
+            }
+            
+            // Convert to JPEG
+            val jpegBytes = try {
+                encodeToJPEG(image)
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ Error encoding JPEG: ${e.message}", e)
+                return
+            }
+            
+            // Send to callback (if set)
+            try {
                 frameCallback?.invoke(jpegBytes)
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ Error in frameCallback: ${e.message}", e)
+            }
 
-                // Send to WebSocket client (primary path)
+            // Send to WebSocket client (primary path)
+            try {
                 if (::webSocketClient.isInitialized) {
                     webSocketClient.queueFrame(jpegBytes)
                     Log.d(TAG, "📤 Frame queued to WebSocket: ${jpegBytes.size / 1024}KB")
                 } else {
                     Log.e(TAG, "❌ webSocketClient NOT initialized!")
                 }
-                
-                // Log frame stats (remove in production)
-                Log.v(TAG, "📸 Frame captured: ${jpegBytes.size / 1024}KB")
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ Error queueing frame to WebSocket: ${e.message}", e)
             }
+            
+            // Log frame stats (remove in production)
+            Log.v(TAG, "📸 Frame captured: ${jpegBytes.size / 1024}KB")
         } catch (e: Exception) {
-            Log.e(TAG, "Error processing frame", e)
+            Log.e(TAG, "❌ Error processing frame: ${e.message}", e)
+            e.printStackTrace()
         } finally {
-            image?.close()
+            try {
+                image?.close()
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ Error closing image: ${e.message}", e)
+            }
         }
     }
 
@@ -334,6 +436,10 @@ class ScreenCaptureService : Service() {
      */
     private fun stopCapture() {
         Log.d(TAG, "Stopping screen capture")
+        
+        // Stop watchdog
+        watchdogRunnable?.let { handler?.removeCallbacks(it) }
+        watchdogRunnable = null
         
         imageReader?.close()
         virtualDisplay?.release()
