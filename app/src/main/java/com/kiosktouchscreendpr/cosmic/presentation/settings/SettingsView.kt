@@ -78,6 +78,7 @@ fun SettingsRoot(
     }
 
     var autoStartRequested by remember { mutableStateOf(false) }
+    var shouldNavigateHome by remember { mutableStateOf(false) }
 
     val screenCaptureLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
@@ -103,6 +104,8 @@ fun SettingsRoot(
                     data = result.data
                 )
                 android.util.Log.e("SettingsView", "✅ onScreenCapturePermissionGranted called")
+                android.util.Log.e("SettingsView", "✅✅✅ PERMISSION GRANTED - Setting shouldNavigateHome=true ✅✅✅")
+                shouldNavigateHome = true
             } else {
                 android.util.Log.e("SettingsView", "Device not registered - missing ID or Token")
                 Toast.makeText(
@@ -110,6 +113,7 @@ fun SettingsRoot(
                     "Remote Control belum terdaftar. Coba submit ulang.",
                     Toast.LENGTH_SHORT
                 ).show()
+                shouldNavigateHome = true
             }
         } else {
             android.util.Log.w("SettingsView", "Screen capture permission denied")
@@ -118,6 +122,7 @@ fun SettingsRoot(
                 "Izin screen capture dibutuhkan untuk Remote Control.",
                 Toast.LENGTH_SHORT
             ).show()
+            shouldNavigateHome = true
         }
     }
 
@@ -140,7 +145,8 @@ fun SettingsRoot(
                     android.util.Log.e("SettingsView", "📺 createScreenCaptureIntent() returned: $intent")
                     android.util.Log.e("SettingsView", "🚀🚀🚀 LAUNCHING screenCaptureLauncher NOW 🚀🚀🚀")
                     screenCaptureLauncher.launch(intent)
-                    android.util.Log.e("SettingsView", "✅ screenCaptureLauncher.launch() called")
+                    android.util.Log.e("SettingsView", "✅ screenCaptureLauncher.launch() called - WAITING FOR PERMISSION RESULT...")
+                    // DO NOT navigate yet - wait for permission result in launcher callback
                 } else {
                     android.util.Log.e("SettingsView", "❌ Cannot start remote - prefs empty (ID: '$deviceId', Token: '$deviceToken')")
                     Toast.makeText(
@@ -148,11 +154,18 @@ fun SettingsRoot(
                         "Remote Control belum terdaftar. Coba submit ulang.",
                         Toast.LENGTH_SHORT
                     ).show()
+                    shouldNavigateHome = true
                 }
             } else {
                 android.util.Log.e("SettingsView", "⚠️ autoStartRequested already true, skipping screen capture launch")
             }
-            android.util.Log.e("SettingsView", "🏠 Navigating back to AppHome...")
+        }
+    }
+
+    // Separate LaunchedEffect for navigation - only navigate when permission result comes back
+    LaunchedEffect(shouldNavigateHome) {
+        if (shouldNavigateHome) {
+            android.util.Log.e("SettingsView", "🏠🏠🏠 Permission result received - Navigating back to AppHome...")
             navController.navigate(Route.AppHome) {
                 popUpTo(Route.AppSettings) {
                     inclusive = true
