@@ -79,26 +79,22 @@ class MetricsReporter @Inject constructor() {
                 .writeTimeout(TIMEOUT_SECONDS, TimeUnit.SECONDS)
                 .build()
             
-            // Backend API expects: device_id, quality, latency_ms, fps, resolution, drop_rate
+            // Backend API exact format - all fields at top level
             val json = JSONObject().apply {
                 put("device_id", deviceId)
-                put("quality", qualityLevel)
-                put("latency_ms", latency)
+                put("timestamp", timestamp)
+                put("latency", latency)
+                put("average_latency", avgLatency)
+                put("throughput", throughput)
+                put("average_throughput", avgThroughput)
+                put("jitter", jitter)
+                put("frame_drop_rate", frameDropRate)
+                put("dropped_frames", droppedFrames)
+                put("total_frames", totalFrames)
+                put("quality_level", qualityLevel)
                 put("fps", fps)
                 put("resolution", resolution)
-                put("drop_rate", frameDropRate)
-                
-                // Optional metadata field for additional metrics
-                put("metadata", JSONObject().apply {
-                    put("timestamp", timestamp)
-                    put("average_latency", avgLatency)
-                    put("throughput", throughput)
-                    put("average_throughput", avgThroughput)
-                    put("jitter", jitter)
-                    put("dropped_frames", droppedFrames)
-                    put("total_frames", totalFrames)
-                    put("connection_health", connectionHealth)
-                })
+                put("connection_health", connectionHealth)
             }.toString()
             
             val body = json.toRequestBody(CONTENT_TYPE.toMediaType())

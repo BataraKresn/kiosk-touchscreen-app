@@ -212,8 +212,8 @@ class RemoteControlViewModel @Inject constructor(
                         timestamp = System.currentTimeMillis(),
                         latency = health.lastLatency,
                         avgLatency = calculateAverageLatency(),
-                        throughput = calculateCurrentThroughput(),
-                        avgThroughput = health.estimatedThroughput,
+                        throughput = (calculateCurrentThroughput() / 1_000_000), // bps to Mbps
+                        avgThroughput = (health.estimatedThroughput / 1_000_000), // bps to Mbps
                         jitter = health.jitter,
                         frameDropRate = calculateFrameDropRate(),
                         droppedFrames = health.droppedFrames.toInt(),
