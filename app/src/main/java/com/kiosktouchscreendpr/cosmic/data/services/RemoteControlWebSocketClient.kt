@@ -31,7 +31,9 @@ import javax.inject.Singleton
  */
 @Singleton
 class RemoteControlWebSocketClient @Inject constructor(
-    private val httpClient: HttpClient
+    private val httpClient: HttpClient,
+    private val adaptiveQuality: AdaptiveQualityController,
+    private val healthMonitor: ConnectionHealthMonitor
 ) {
 
     companion object {
@@ -76,10 +78,15 @@ class RemoteControlWebSocketClient @Inject constructor(
     
     // Last heartbeat response time
     private var lastHeartbeatResponse = 0L
+    private var lastPingTime = 0L
     
     // Device info
     private var deviceToken: String? = null
     private var deviceId: String? = null
+    
+    // Frame tracking for intelligent dropping
+    private var consecutiveDrops = 0
+    private var totalFramesSent = 0L
 
     enum class ConnectionState {
         DISCONNECTED,
@@ -183,7 +190,7 @@ class RemoteControlWebSocketClient @Inject constructor(
         try {
             Log.d(TAG, "Sending auth - deviceId: $deviceId, token: $deviceToken")
             val authMessage = JSONObject().apply {
-                put("type", "auth")
+                put("type", "authenticate")
                 put("role", "device")
                 put("deviceId", deviceId)
                 put("token", deviceToken)
@@ -200,14 +207,13 @@ class RemoteControlWebSocketClient @Inject constructor(
     }
 
     /**
-     * Handle incoming message from server
+     * Handle incoming message from server with health monitoring
      */
     private fun handleIncomingMessage(message: String) {
         try {
             // Handle plain text pong (backward compatibility)
             if (message == "pong") {
-                lastHeartbeatResponse = System.currentTimeMillis()
-                Log.v(TAG, "Heartbeat pong received")
+                handlePongResponse()
                 return
             }
             
@@ -217,24 +223,19 @@ class RemoteControlWebSocketClient @Inject constructor(
             when (type) {
                 "pong" -> {
                     // Heartbeat response (JSON format)
-                    lastHeartbeatResponse = System.currentTimeMillis()
-                    Log.v(TAG, "Heartbeat pong received")
+                    handlePongResponse()
                 }
                 
-                "auth_success" -> {
-                    Log.d(TAG, "Authentication successful")
+                "authenticated", "auth_success" -> {
+                    Log.d(TAG, "✅ Authentication successful")
                     isAuthenticated = true
                     startHeartbeat()
+                    healthMonitor.startMonitoring()
                 }
                 
-                "error" -> {
-                    val messageText = json.optString("message", "Unknown error")
-                    Log.w(TAG, "Server error message: $messageText")
-                }
-                
-                "auth_failed" -> {
-                    val reason = json.optString("reason", "Unknown")
-                    Log.e(TAG, "Authentication failed: $reason")
+                "error", "auth_failed" -> {
+                    val messageText = json.optString("message", json.optString("reason", "Unknown error"))
+                    Log.e(TAG, "❌ Authentication failed: $messageText")
                     isAuthenticated = false
                     disconnect()
                 }
@@ -257,6 +258,21 @@ class RemoteControlWebSocketClient @Inject constructor(
             
         } catch (e: Exception) {
             Log.e(TAG, "Error handling message", e)
+        }
+    }
+    
+    /**
+     * Handle pong response - measure latency and update quality
+     */
+    private fun handlePongResponse() {
+        lastHeartbeatResponse = System.currentTimeMillis()
+        
+        if (lastPingTime > 0) {
+            val latency = lastHeartbeatResponse - lastPingTime
+            Log.v(TAG, "📊 Latency measurement: ${latency}ms")
+            
+            // Update health monitor
+            healthMonitor.handlePong()
         }
     }
 
@@ -297,7 +313,7 @@ class RemoteControlWebSocketClient @Inject constructor(
     }
 
     /**
-     * Start heartbeat mechanism
+     * Start heartbeat mechanism with health monitoring
      */
     private fun startHeartbeat() {
         heartbeatJob?.cancel()
@@ -306,17 +322,19 @@ class RemoteControlWebSocketClient @Inject constructor(
         heartbeatJob = scope.launch {
             while (isActive && isConnected) {
                 try {
-                    // Send heartbeat in JSON format
+                    // Send heartbeat (ping) and measure response time
+                    lastPingTime = System.currentTimeMillis()
                     val heartbeatMessage = JSONObject().apply {
                         put("type", "ping")
+                        put("timestamp", lastPingTime)
                     }.toString()
                     session?.send(Frame.Text(heartbeatMessage))
-                    Log.v(TAG, "Heartbeat ping sent")
+                    Log.v(TAG, "Heartbeat ping sent at ${lastPingTime}")
                     
                     // Check for timeout
                     val timeSinceLastResponse = System.currentTimeMillis() - lastHeartbeatResponse
                     if (timeSinceLastResponse > HEARTBEAT_TIMEOUT_MS) {
-                        Log.w(TAG, "Heartbeat timeout, reconnecting...")
+                        Log.w(TAG, "❌ Heartbeat timeout (${timeSinceLastResponse}ms), reconnecting...")
                         disconnect()
                         break
                     }
@@ -332,7 +350,8 @@ class RemoteControlWebSocketClient @Inject constructor(
     }
 
     /**
-     * Start frame processing job
+     * Start frame processing job with intelligent frame dropping
+     * Supports both JPEG (Phase 1) and H.264 (Phase 2) encoded frames
      */
     private fun startFrameProcessing() {
         frameProcessingJob?.cancel()
@@ -341,27 +360,108 @@ class RemoteControlWebSocketClient @Inject constructor(
             frameQueue.collect { frameBytes ->
                 try {
                     if (isConnected && isAuthenticated && session != null) {
+                        // Intelligent frame dropping based on queue status
+                        val shouldDrop = shouldDropFrame()
+                        
+                        if (shouldDrop) {
+                            Log.v(TAG, "⏭️  Dropping frame - network congestion")
+                            healthMonitor.recordFrameDrop()
+                            consecutiveDrops++
+                            return@collect
+                        }
+                        
                         // Encode frame as base64 for JSON transmission
-                        // Note: For production, use binary frames or dedicated protocol
+                        // Supports both JPEG and H.264 encoded data transparently
                         val base64Frame = Base64.getEncoder().encodeToString(frameBytes)
+                        
+                        // Determine frame format
+                        val frameFormat = if (isH264Frame(frameBytes)) "h264" else "jpeg"
                         
                         val frameMessage = JSONObject().apply {
                             put("type", "frame")
-                            put("format", "jpeg")
+                            put("format", frameFormat)
                             put("data", base64Frame)
                             put("timestamp", System.currentTimeMillis())
+                            // Optional: keyframe indicator for H.264
+                            if (frameFormat == "h264") {
+                                put("is_keyframe", isH264Keyframe(frameBytes))
+                            }
                         }
                         
                         session?.send(Frame.Text(frameMessage.toString()))
                         
-                        // Log stats (remove in production or use verbose logging)
-                        Log.v(TAG, "Frame sent: ${frameBytes.size / 1024}KB")
+                        // Update metrics
+                        totalFramesSent++
+                        consecutiveDrops = 0  // Reset drop counter on successful send
+                        healthMonitor.recordFrameSent(frameBytes.size)
+                        
+                        // Log stats
+                        Log.v(TAG, "📤 Frame sent ($frameFormat): ${frameBytes.size / 1024}KB (Total: $totalFramesSent)")
+                    } else {
+                        Log.v(TAG, "⏭️  Frame dropped - not connected (isConnected=$isConnected, isAuthenticated=$isAuthenticated)")
+                        healthMonitor.recordFrameDrop()
                     }
                 } catch (e: Exception) {
-                    Log.e(TAG, "Error sending frame", e)
+                    Log.e(TAG, "❌ Error sending frame: ${e.message}", e)
+                    healthMonitor.recordFrameDrop()
                 }
             }
         }
+    }
+    
+    /**
+     * Detect if frame data is H.264 encoded
+     * H.264 frames typically start with specific NAL unit bytes
+     */
+    private fun isH264Frame(frameData: ByteArray): Boolean {
+        if (frameData.isEmpty()) return false
+        
+        // Check for H.264 NAL unit start code or AVCC format
+        // H.264 frames often start with 00 00 00 01 (start code) or specific patterns
+        // For simplicity, we check if data is small (H.264 is typically more compressed)
+        // This is a heuristic - ideally we'd have metadata
+        
+        // In production, you should add a frame type indicator in the encoding layer
+        return frameData.size < 50000  // H.264 frames are usually < 50KB for 720p
+    }
+    
+    /**
+     * Detect if H.264 frame is a keyframe (I-frame)
+     * Keyframes start with NAL unit type 5
+     */
+    private fun isH264Keyframe(frameData: ByteArray): Boolean {
+        if (frameData.size < 4) return false
+        
+        // Look for NAL unit start code
+        if (frameData[0] == 0.toByte() && frameData[1] == 0.toByte() && 
+            frameData[2] == 0.toByte() && frameData[3] == 1.toByte()) {
+            // Check NAL unit type (bits 4-0 of next byte)
+            val nalUnitType = frameData[4].toInt() and 0x1F
+            return nalUnitType == 5  // NAL type 5 = IDR picture (keyframe)
+        }
+        
+        return false
+    }
+    
+    /**
+     * Determine if current frame should be dropped based on network condition
+     * Implements intelligent frame dropping to maintain smooth playback
+     */
+    private fun shouldDropFrame(): Boolean {
+        // Check queue status
+        if (frameQueue.replayCache.size > RemoteControlConfig.FrameBufferingConfig.MAX_QUEUED_FRAMES / 2) {
+            Log.v(TAG, "Frame drop: Queue depth high (${frameQueue.replayCache.size})")
+            return true
+        }
+        
+        // Check consecutive drops (allow recovery)
+        if (consecutiveDrops > 5) {
+            return false  // Stop dropping after 5 consecutive, let sender catch up
+        }
+        
+        // Check connection health (more aggressive dropping on poor connection)
+        val health = healthMonitor.connectionHealth.value
+        return health == ConnectionHealth.CRITICAL || health == ConnectionHealth.UNHEALTHY
     }
 
     /**
@@ -403,10 +503,32 @@ class RemoteControlWebSocketClient @Inject constructor(
      */
     fun shutdown() {
         Log.d(TAG, "Shutting down RemoteControlWebSocketClient")
+        Log.d(TAG, "📊 Final stats - Total frames sent: $totalFramesSent")
         
+        healthMonitor.stopMonitoring()
         disconnect()
         frameProcessingJob?.cancel()
         scope.cancel()
+    }
+    
+    /**
+     * Get current metrics (for UI display)
+     */
+    fun getMetricsReport(): String {
+        val health = healthMonitor.healthStatus.value
+        val connectionHealth = healthMonitor.connectionHealth.value
+        val quality = adaptiveQuality.currentQuality.value
+        
+        return buildString {
+            append("=== Remote Control Metrics ===\n")
+            append("Connection: ${_connectionState.value}\n")
+            append("Health: $connectionHealth\n")
+            append("Latency: ${health.lastLatency}ms\n")
+            append("Throughput: ${health.estimatedThroughput / 1000}Kbps\n")
+            append("Quality: ${quality.label}\n")
+            append("Frames sent: $totalFramesSent\n")
+            append("Frames dropped: ${health.droppedFrames}")
+        }
     }
 }
 

@@ -111,6 +111,14 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
+    
+    /* =================> H.264 & Media Codec <================= */
+    implementation("androidx.media3:media3-common:1.1.1")
+    implementation("androidx.media3:media3-exoplayer:1.1.1")
+    
+    /* =================> Network Monitoring & Utils <================= */
+    implementation("androidx.work:work-runtime-ktx:2.8.1")
+    implementation("org.json:json:20230227")
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
