@@ -14,6 +14,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import javax.inject.Inject
 
 /**
@@ -34,9 +37,15 @@ class RemoteControlService : Service() {
 
     @Inject
     lateinit var preferences: SharedPreferences
+    
+    @Inject
+    lateinit var metricsReporter: MetricsReporter
 
     // Service scope - survives UI lifecycle
     private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    
+    // Metrics reporting job
+    private var metricsReportingJob: Job? = null
 
     // Binder for local communication
     private val binder = LocalBinder()
@@ -58,6 +67,13 @@ class RemoteControlService : Service() {
             webSocketClient.connectionState.value != RemoteControlWebSocketClient.ConnectionState.CONNECTING) {
             startConnection()
         }
+        
+        // Initialize metrics reporter with API URL
+        val apiUrl = BuildConfig.WEBVIEW_BASEURL
+        metricsReporter.initialize(apiUrl)
+        
+        // Start sending health metrics every 5 seconds
+        startHealthReporting()
 
         // Keep service running even after process restart
         return START_STICKY
@@ -92,6 +108,47 @@ class RemoteControlService : Service() {
             }
         }
     }
+    
+    /**
+     * Start reporting health metrics to backend
+     * Sends data every 5 seconds during remote control session
+     */
+    private fun startHealthReporting() {
+        Log.d(TAG, "📊 Starting health metrics reporting...")
+        
+        metricsReportingJob?.cancel()
+        metricsReportingJob = serviceScope.launch {
+            while (isActive) {
+                try {
+                    val remoteId = preferences.getString(AppConstant.REMOTE_ID, "") ?: ""
+                    
+                    if (remoteId.isNotEmpty()) {
+                        metricsReporter.sendHealthReport(
+                            deviceId = remoteId,
+                            timestamp = System.currentTimeMillis(),
+                            latency = 45L,                    // TODO: from ConnectionHealthMonitor
+                            avgLatency = 42L,
+                            throughput = 5200000L,            // TODO: from ConnectionHealthMonitor
+                            avgThroughput = 5000000L,
+                            jitter = 8L,
+                            frameDropRate = 0.005,
+                            droppedFrames = 5,
+                            totalFrames = 1000,
+                            qualityLevel = "HIGH",            // TODO: from AdaptiveQualityController
+                            fps = 30,
+                            resolution = "1920x1080",         // TODO: from ScreenCaptureService
+                            connectionHealth = "HEALTHY"      // TODO: from ConnectionHealthMonitor
+                        )
+                    }
+                    
+                    delay(5000)  // Wait 5 seconds
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error reporting metrics: ${e.message}")
+                    delay(5000)
+                }
+            }
+        }
+    }
 
     /**
      * Stop WebSocket connection (graceful shutdown)
@@ -114,6 +171,7 @@ class RemoteControlService : Service() {
         Log.d(TAG, "🔴 RemoteControlService destroyed")
 
         // Cleanup
+        metricsReportingJob?.cancel()
         stopConnection()
         serviceScope.cancel()
     }
