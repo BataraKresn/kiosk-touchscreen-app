@@ -26,6 +26,41 @@ class DeviceApi @Inject constructor(
     private val client: HttpClient
 ) {
     /**
+     * Check if device exists in CMS database
+     * Endpoint: GET /api/devices/check
+     * 
+     * Mengirim: device_id
+     * Menerima: remote_id, token jika device sudah terdaftar
+     */
+    suspend fun checkExistingDevice(
+        baseUrl: String,
+        deviceId: String
+    ): RegisterRemoteResponse? {
+        return try {
+            Log.d("DeviceApi", "🔍 START: checkExistingDevice()")
+            Log.d("DeviceApi", "📍 Target: $baseUrl/api/devices/check")
+            Log.d("DeviceApi", "📦 Device ID: $deviceId")
+            
+            Log.d("DeviceApi", "🌐 Sending HTTP GET request...")
+            val response = client.get("$baseUrl/api/devices/check") {
+                parameter("device_id", deviceId)
+            }.body<RegisterRemoteResponse>()
+
+            Log.d("DeviceApi", "✅ Device found in database")
+            Log.d("DeviceApi", "  - success: ${response.success}")
+            Log.d("DeviceApi", "  - message: ${response.message}")
+            Log.d("DeviceApi", "  - remote_id: ${response.data.remoteId}")
+            Log.d("DeviceApi", "  - token: ${response.data.token.take(10)}...")
+            
+            response
+        } catch (e: Exception) {
+            Log.d("DeviceApi", "📱 Device not found in database - will need registration")
+            Log.d("DeviceApi", "   Exception: ${e.message}")
+            null
+        }
+    }
+
+    /**
      * Register device ke Remote
      * Endpoint: POST /api/devices/register
      * 

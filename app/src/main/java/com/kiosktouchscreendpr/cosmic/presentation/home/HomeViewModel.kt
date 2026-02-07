@@ -6,6 +6,7 @@ import com.kiosktouchscreendpr.cosmic.BuildConfig
 import com.kiosktouchscreendpr.cosmic.core.utils.ConnectivityObserver
 import com.kiosktouchscreendpr.cosmic.core.utils.Preference
 import com.kiosktouchscreendpr.cosmic.data.datasource.refreshmechanism.RefreshRes
+import com.kiosktouchscreendpr.cosmic.data.api.DeviceApi
 import com.kiosktouchscreendpr.cosmic.domain.usecase.RemoteRefreshUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
@@ -24,7 +25,8 @@ import javax.inject.Inject
 class HomeViewModel @Inject constructor(
     private val preference: Preference,
     private val refreshUseCase: RemoteRefreshUseCase,
-    private val connectivityObserver: ConnectivityObserver
+    private val connectivityObserver: ConnectivityObserver,
+    private val deviceApi: DeviceApi
 ) : ViewModel() {
 
     private val webviewUrl = BuildConfig.WEBVIEW_BASEURL
@@ -35,6 +37,10 @@ class HomeViewModel @Inject constructor(
 
     private val timeout
         get() = preference.get("timeout", null)?.toIntOrNull() ?: 1
+
+    init {
+        checkExistingDeviceAndAutoStart()
+    }
 
     private val _state = MutableStateFlow(HomeState())
     val state = _state
@@ -141,6 +147,64 @@ class HomeViewModel @Inject constructor(
     private fun cancelInactivityTimer() {
         inactivityTimerJob?.cancel()
         inactivityTimerJob = null
+    }
+
+    /**
+     * Check if device exists in CMS and auto-start remote control if device found
+     */
+    private fun checkExistingDeviceAndAutoStart() = viewModelScope.launch {
+        try {
+            val deviceId = preference.get("device_id", null)
+            if (deviceId.isNullOrEmpty()) {
+                println("HomeViewModel: No device_id found, skipping existing device check")
+                return@launch
+            }
+
+            println("HomeViewModel: Checking existing device: $deviceId")
+            
+            // Try to check existing device via API
+            val existingDevice = try {
+                deviceApi.checkExistingDevice(
+                    baseUrl = webviewUrl,
+                    deviceId = deviceId
+                )
+            } catch (e: Exception) {
+                println("HomeViewModel: API checkExistingDevice failed: ${e.message}")
+                null
+            }
+            
+            if (existingDevice != null && 
+                existingDevice.success &&
+                existingDevice.data.remoteId > 0 && 
+                existingDevice.data.token.isNotEmpty()) {
+                
+                println("HomeViewModel: Device exists via API, storing credentials and auto-starting")
+                preference.set("remote_id", existingDevice.data.remoteId.toString())
+                preference.set("remote_token", existingDevice.data.token)
+                startRemoteControlService()
+                
+            } else {
+                // Fallback: Check if we already have stored credentials
+                val storedRemoteId = preference.get("remote_id", null)
+                val storedRemoteToken = preference.get("remote_token", null)
+                
+                if (!storedRemoteId.isNullOrEmpty() && !storedRemoteToken.isNullOrEmpty()) {
+                    println("HomeViewModel: Using stored credentials for auto-start")
+                    println("HomeViewModel: Remote ID: $storedRemoteId, Token: ${storedRemoteToken.take(20)}...")
+                    startRemoteControlService()
+                } else {
+                    println("HomeViewModel: No stored credentials found, skipping auto-start")
+                }
+            }
+        } catch (e: Exception) {
+            println("HomeViewModel: Error in auto-start check: ${e.message}")
+        }
+    }
+
+    private fun startRemoteControlService() {
+        // TODO: Add logic to start RemoteControlService with auto_start=true
+        // This will be implemented when we have service injection or context access
+        println("HomeViewModel: Auto-start should trigger RemoteControlService")
     }
 
     override fun onCleared() {

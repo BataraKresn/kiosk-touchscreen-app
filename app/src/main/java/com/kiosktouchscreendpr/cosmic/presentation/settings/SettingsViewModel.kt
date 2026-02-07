@@ -115,14 +115,6 @@ class SettingsViewModel @Inject constructor(
         }
         Log.e(TAG, "✅ Preferences saved")
 
-        // Register display to backend (optional, non-blocking)
-        registerDisplayToken(_state.value.token)
-        Log.e(TAG, "✅ Display token registered")
-
-        // Register device to remote-control backend (required for relay auth)
-        registerRemoteDeviceAndStore()
-        Log.e(TAG, "✅ Remote device registered")
-
         // Schedule alarms
         _state.value.powerOffTime?.let { powerOff ->
             _state.value.powerOnTime?.let { powerOn ->
@@ -131,13 +123,20 @@ class SettingsViewModel @Inject constructor(
         }
         Log.e(TAG, "✅ Alarms scheduled")
         
-        // Auto-start remote control after submit
-        startRemoteControlAfterSubmit()
-        Log.e(TAG, "✅ startRemoteControlAfterSubmit() completed")
-        
         Log.e(TAG, "🚀🚀🚀 Setting isSuccess = true")
         _state.update { it.copy(isSuccess = true, errorMessage = null) }
         Log.e(TAG, "✅ State updated - isSuccess should now be true")
+
+        // Run network calls in background to avoid blocking UI navigation
+        viewModelScope.launch {
+            // Register display to backend (optional, non-blocking)
+            registerDisplayToken(_state.value.token)
+            Log.e(TAG, "✅ Display token registered (background)")
+
+            // Register device to remote-control backend (required for relay auth)
+            registerRemoteDeviceAndStore()
+            Log.e(TAG, "✅ Remote device registration flow completed (background)")
+        }
     }
     
     /**
@@ -180,16 +179,47 @@ class SettingsViewModel @Inject constructor(
         try {
             val baseUrl = BuildConfig.WEBVIEW_BASEURL
             Log.d(TAG, "📍 Base URL: $baseUrl")
-            
-            val deviceId = Settings.Secure.getString(
-                context.contentResolver,
-                Settings.Secure.ANDROID_ID
-            ) ?: ""
+
+            val deviceId = getOrCreateDeviceId()
             Log.d(TAG, "📱 Device ID: $deviceId")
             
             val deviceName = "${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}"
             Log.d(TAG, "🏷️ Device Name: $deviceName")
             Log.d(TAG, "📦 App Version: ${BuildConfig.VERSION_NAME}")
+
+            // 1) Use stored credentials if present (avoid regenerating tokens)
+            val storedRemoteId = preferences.getString(AppConstant.REMOTE_ID, null)
+            val storedRemoteToken = preferences.getString(AppConstant.REMOTE_TOKEN, null)
+            if (!storedRemoteId.isNullOrEmpty() && !storedRemoteToken.isNullOrEmpty()) {
+                Log.d(TAG, "✅ Stored credentials found - skipping registration")
+                startRemoteControlAfterSubmit()
+                return
+            }
+
+            // 2) Check existing device in CMS before registering
+            val existingDevice = try {
+                deviceApi.checkExistingDevice(
+                    baseUrl = baseUrl,
+                    deviceId = deviceId
+                )
+            } catch (e: Exception) {
+                Log.w(TAG, "⚠️ checkExistingDevice failed: ${e.message}")
+                null
+            }
+
+            if (existingDevice != null && existingDevice.success &&
+                existingDevice.data.remoteId > 0 && existingDevice.data.token.isNotEmpty()
+            ) {
+                Log.d(TAG, "✅ Existing device found in CMS - storing credentials")
+                preferences.edit().apply {
+                    putString(AppConstant.DEVICE_ID, deviceId)
+                    putString(AppConstant.REMOTE_ID, existingDevice.data.remoteId.toString())
+                    putString(AppConstant.REMOTE_TOKEN, existingDevice.data.token)
+                    apply()
+                }
+                startRemoteControlAfterSubmit()
+                return
+            }
 
             Log.d(TAG, "🌐 Calling API: registerRemoteDevice()")
             val response = deviceApi.registerRemoteDevice(
@@ -219,6 +249,7 @@ class SettingsViewModel @Inject constructor(
                         Log.d(TAG, "  ✓ Preferences apply() complete")
                     }
                     Log.d(TAG, "✅ Remote registration SUCCESS: remote_id=${response.data.remoteId}")
+                    startRemoteControlAfterSubmit()
                 } else {
                     Log.e(TAG, "❌ Remote registration FAILED: success=false")
                     Log.e(TAG, "   Message: ${response.message}")
@@ -258,6 +289,25 @@ class SettingsViewModel @Inject constructor(
         } catch (e: Exception) {
             Log.e(TAG, "❌ Failed to start remote control service: ${e.message}", e)
         }
+    }
+
+    private fun getOrCreateDeviceId(): String {
+        val stored = preferences.getString(AppConstant.DEVICE_ID, null)
+        if (!stored.isNullOrEmpty()) {
+            return stored
+        }
+
+        val androidId = Settings.Secure.getString(
+            context.contentResolver,
+            Settings.Secure.ANDROID_ID
+        ) ?: "unknown_device_${System.currentTimeMillis()}"
+
+        preferences.edit().apply {
+            putString(AppConstant.DEVICE_ID, androidId)
+            apply()
+        }
+
+        return androidId
     }
     
     companion object {
