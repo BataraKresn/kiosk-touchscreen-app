@@ -93,8 +93,8 @@ class CosmicApp : Application() {
                         android.util.Log.e("CosmicApp", "🎫 Display token: $displayToken")
                         
                         if (!displayToken.isNullOrEmpty()) {
-                            println("CosmicApp: Found display token, triggering auto-registration")
-                            triggerAutoRegistration(deviceId)
+                            println("CosmicApp: Found display token - but waiting for user to submit settings")
+                            println("CosmicApp: Will register on explicit user action, not auto-register to prevent duplicates")
                         } else {
                             android.util.Log.e("CosmicApp", "✅ No display token found - manual setup required.")
                             android.util.Log.e("CosmicApp", "⚠️ Device is new, user must configure settings first.")
@@ -143,45 +143,6 @@ class CosmicApp : Application() {
         } catch (e: Exception) {
             println("CosmicApp: Error starting RemoteControlService: ${e.message}")
             e.printStackTrace()
-        }
-    }
-
-    /**
-     * Trigger automatic registration for new device with default settings
-     */
-    private fun triggerAutoRegistration(deviceId: String) {
-        applicationScope.launch {
-            try {
-                println("CosmicApp: Starting auto-registration for device: $deviceId")
-                
-                // Register device automatically
-                val deviceName = "${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}"
-                val response = deviceApi.registerRemoteDevice(
-                    baseUrl = BuildConfig.WEBVIEW_BASEURL,
-                    deviceId = deviceId,
-                    deviceName = deviceName,
-                    appVersion = BuildConfig.VERSION_NAME
-                )
-                
-                if (response != null && response.success) {
-                    println("CosmicApp: Auto-registration SUCCESS")
-                    
-                    // Store credentials
-                    preference.set("remote_id", response.data.remoteId.toString())
-                    preference.set("remote_token", response.data.token)
-                    
-                    // Auto-start remote control
-                    startRemoteControlService()
-                    
-                    println("CosmicApp: Device fully configured and auto-started!")
-                } else {
-                    println("CosmicApp: Auto-registration FAILED - manual setup required")
-                }
-                
-            } catch (e: Exception) {
-                println("CosmicApp: Error in auto-registration: ${e.message}")
-                e.printStackTrace()
-            }
         }
     }
 }
