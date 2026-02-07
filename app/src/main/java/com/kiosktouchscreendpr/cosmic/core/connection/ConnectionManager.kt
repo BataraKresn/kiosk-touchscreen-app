@@ -240,6 +240,37 @@ class ConnectionManager @Inject constructor(
     }
 
     /**
+     * Connect for auto-start scenarios (bypass network stability check)
+     * Used after screen capture permission granted for immediate connection
+     */
+    fun connectForAutoStart(token: String) {
+        Log.d(TAG, "🚀 Auto-start connection requested (bypassing network stability check)")
+        
+        // Save token FIRST before any checks
+        deviceToken = token
+        reconnectAttempt = 0
+        
+        if (_connectionState.value is ConnectionState.Connected) {
+            Log.d(TAG, "Already connected, skipping auto-start")
+            return
+        }
+
+        if (_connectionState.value is ConnectionState.ServerBlocked) {
+            val blocked = _connectionState.value as ConnectionState.ServerBlocked
+            val until = blocked.until
+            if (until != null && System.currentTimeMillis() < until) {
+                Log.w(TAG, "Connection blocked by server until ${until - System.currentTimeMillis()}ms")
+                return
+            }
+        }
+
+        // BYPASS network stability check for auto-start
+        Log.d(TAG, "🚀 Starting immediate connection for auto-start (network stability bypassed)")
+        _connectionState.value = ConnectionState.Connecting
+        startHeartbeat()
+    }
+
+    /**
      * FIX #1 & #2: Unified Heartbeat
      * HTTP heartbeat to CMS is the ONLY source of truth for connection state.
      * WebSocket heartbeat (if any) is for transport health only.

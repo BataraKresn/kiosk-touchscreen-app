@@ -39,6 +39,9 @@ class RemoteControlService : Service() {
     lateinit var preferences: SharedPreferences
     
     @Inject
+    lateinit var connectionManager: com.kiosktouchscreendpr.cosmic.core.connection.ConnectionManager
+    
+    @Inject
     lateinit var metricsReporter: MetricsReporter
 
     // Service scope - survives UI lifecycle
@@ -61,11 +64,14 @@ class RemoteControlService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.d(TAG, "🟢 RemoteControlService started")
+        
+        val isAutoStart = intent?.getBooleanExtra("auto_start", false) ?: false
+        Log.d(TAG, "🔧 Auto-start mode: $isAutoStart")
 
         // Start connection if not already active
         if (webSocketClient.connectionState.value != RemoteControlWebSocketClient.ConnectionState.CONNECTED &&
             webSocketClient.connectionState.value != RemoteControlWebSocketClient.ConnectionState.CONNECTING) {
-            startConnection()
+            startConnection(isAutoStart)
         }
         
         // Initialize metrics reporter with API URL
@@ -80,10 +86,10 @@ class RemoteControlService : Service() {
     }
 
     /**
-     * Start WebSocket connection
+     * Start WebSocket connection with auto-start support
      */
-    private fun startConnection() {
-        Log.d(TAG, "🔌 Starting WebSocket connection from Service...")
+    private fun startConnection(isAutoStart: Boolean = false) {
+        Log.d(TAG, "🔌 Starting WebSocket connection from Service... (auto_start=$isAutoStart)")
 
         serviceScope.launch {
             try {
@@ -95,14 +101,44 @@ class RemoteControlService : Service() {
                     return@launch
                 }
 
+                // Use ConnectionManager for reliable connection with auto-start support
+                if (isAutoStart) {
+                    Log.d(TAG, "🚀 Using auto-start connection (bypassing network stability)")
+                    connectionManager.connectForAutoStart(remoteToken)
+                } else {
+                    Log.d(TAG, "🔗 Using normal connection")
+                    connectionManager.connect(remoteToken)
+                }
+
+                // Also start direct WebSocket connection for screen capture
                 val baseUrl = BuildConfig.WEBVIEW_BASEURL
                 val wsUrl = baseUrl.replace("http://", "ws://")
                     .replace("https://", "wss://") + "/remote-control-ws"
 
-                Log.d(TAG, "📡 Connecting to: $wsUrl")
-                webSocketClient.connect(wsUrl, remoteToken, remoteId)
+                Log.d(TAG, "📡 Starting WebSocket for screen capture: $wsUrl")
+                
+                // Retry mechanism for WebSocket connection
+                var retryCount = 0
+                val maxRetries = 3
+                
+                while (retryCount < maxRetries && isActive) {
+                    try {
+                        webSocketClient.connect(wsUrl, remoteToken, remoteId)
+                        Log.d(TAG, "✅ WebSocket connection initiated successfully")
+                        break
+                    } catch (e: Exception) {
+                        retryCount++
+                        Log.w(TAG, "⚠️ WebSocket connection failed (attempt $retryCount/$maxRetries): ${e.message}")
+                        if (retryCount < maxRetries) {
+                            delay(2000L * retryCount) // Progressive backoff: 2s, 4s, 6s
+                        }
+                    }
+                }
+                
+                if (retryCount >= maxRetries) {
+                    Log.e(TAG, "❌ WebSocket connection failed after $maxRetries attempts")
+                }
 
-                Log.d(TAG, "✅ WebSocket connection initiated from Service")
             } catch (e: Exception) {
                 Log.e(TAG, "❌ Failed to start connection", e)
             }

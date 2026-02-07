@@ -250,10 +250,11 @@ class SettingsViewModel @Inject constructor(
         }
         
         try {
-            // Start RemoteControlService (independent from UI lifecycle)
+            // Start RemoteControlService with auto-start flag (independent from UI lifecycle)
             val serviceIntent = android.content.Intent(context, com.kiosktouchscreendpr.cosmic.data.services.RemoteControlService::class.java)
+            serviceIntent.putExtra("auto_start", true) // Enable auto-start mode
             context.startService(serviceIntent)
-            Log.e(TAG, "✅ RemoteControlService started (independent WebSocket connection)")
+            Log.e(TAG, "✅ RemoteControlService started with auto-start mode (independent WebSocket connection)")
         } catch (e: Exception) {
             Log.e(TAG, "❌ Failed to start remote control service: ${e.message}", e)
         }

@@ -103,6 +103,17 @@ fun SettingsRoot(
                     resultCode = result.resultCode,
                     data = result.data
                 )
+                
+                // ENSURE RemoteControlService starts with auto-start mode for background operation
+                try {
+                    val serviceIntent = android.content.Intent(context, com.kiosktouchscreendpr.cosmic.data.services.RemoteControlService::class.java)
+                    serviceIntent.putExtra("auto_start", true)
+                    context.startService(serviceIntent)
+                    android.util.Log.e("SettingsView", "🚀 RemoteControlService explicitly started with auto-start mode")
+                } catch (e: Exception) {
+                    android.util.Log.e("SettingsView", "❌ Failed to start RemoteControlService: ${e.message}")
+                }
+                
                 android.util.Log.e("SettingsView", "✅ onScreenCapturePermissionGranted called")
                 android.util.Log.e("SettingsView", "✅✅✅ PERMISSION GRANTED - Setting shouldNavigateHome=true ✅✅✅")
                 shouldNavigateHome = true
