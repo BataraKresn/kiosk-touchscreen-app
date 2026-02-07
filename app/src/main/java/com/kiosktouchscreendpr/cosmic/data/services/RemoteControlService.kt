@@ -8,6 +8,7 @@ import android.os.IBinder
 import android.util.Log
 import com.kiosktouchscreendpr.cosmic.BuildConfig
 import com.kiosktouchscreendpr.cosmic.core.constant.AppConstant
+import com.kiosktouchscreendpr.cosmic.core.connection.ConnectionManager
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -39,7 +40,7 @@ class RemoteControlService : Service() {
     lateinit var preferences: SharedPreferences
     
     @Inject
-    lateinit var connectionManager: com.kiosktouchscreendpr.cosmic.core.connection.ConnectionManager
+    lateinit var connectionManager: ConnectionManager
     
     @Inject
     lateinit var metricsReporter: MetricsReporter
