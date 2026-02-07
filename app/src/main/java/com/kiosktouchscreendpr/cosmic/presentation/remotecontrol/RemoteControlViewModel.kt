@@ -72,9 +72,6 @@ class RemoteControlViewModel @Inject constructor(
     private var metricsReportingJob: kotlinx.coroutines.Job? = null
     private var lastRelayServerUrl: String? = null
     private var lastAuthToken: String? = null
-    private var tokenRefreshInProgress = false
-    private var tokenRefreshAttempts = 0
-    private val maxTokenRefreshAttempts = 3
 
     init {
         viewModelScope.launch {
@@ -82,79 +79,14 @@ class RemoteControlViewModel @Inject constructor(
                 when (event) {
                     is RemoteControlWebSocketClient.AuthEvent.AuthFailed -> {
                         Log.e("RemoteControlVM", "⚠️ Auth failed from relay: ${event.reason}")
-                        refreshRemoteTokenAndReconnect()
+                        // DISABLED: Don't auto-refresh token on auth failure
+                        // The issue is relay server not recognizing tokens from CMS, not the token itself
+                        // Refreshing token (calling registerRemoteDevice) will create duplicate device entries
+                        // refreshRemoteTokenAndReconnect()
                     }
                 }
             }
         }
-    }
-
-    private fun refreshRemoteTokenAndReconnect() {
-        if (tokenRefreshInProgress) return
-        if (tokenRefreshAttempts >= maxTokenRefreshAttempts) {
-            Log.e("RemoteControlVM", "❌ Max token refresh attempts reached. Skipping refresh.")
-            return
-        }
-
-        val relayUrl = lastRelayServerUrl ?: buildRelayUrlFallback()
-        if (relayUrl.isNullOrBlank()) {
-            Log.w("RemoteControlVM", "⚠️ Missing relay URL, cannot refresh token")
-            return
-        }
-
-        tokenRefreshInProgress = true
-        tokenRefreshAttempts += 1
-
-        appScope.launch {
-            try {
-                Log.e("RemoteControlVM", "🔄 Refreshing remote token from CMS (attempt $tokenRefreshAttempts/$maxTokenRefreshAttempts)")
-
-                val androidId = preferences.getString(AppConstant.DEVICE_ID, null)
-                    ?: Settings.Secure.getString(appContext.contentResolver, Settings.Secure.ANDROID_ID)
-                    ?: ""
-
-                val deviceName = "${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}"
-                val response = deviceApi.registerRemoteDevice(
-                    baseUrl = BuildConfig.WEBVIEW_BASEURL,
-                    deviceId = androidId,
-                    deviceName = deviceName,
-                    appVersion = BuildConfig.VERSION_NAME
-                )
-
-                if (response?.success == true) {
-                    val newRemoteId = response.data.remoteId.toString()
-                    val newToken = response.data.token
-
-                    preferences.edit().apply {
-                        putString(AppConstant.DEVICE_ID, androidId)
-                        putString(AppConstant.REMOTE_ID, newRemoteId)
-                        putString(AppConstant.REMOTE_TOKEN, newToken)
-                        apply()
-                    }
-
-                    currentDeviceId = newRemoteId
-                    lastAuthToken = newToken
-
-                    Log.e("RemoteControlVM", "✅ Token refreshed. Reconnecting with new token...")
-                    webSocketClient.connect(
-                        wsUrl = relayUrl,
-                        token = newToken,
-                        devId = newRemoteId
-                    )
-                } else {
-                    Log.e("RemoteControlVM", "❌ Token refresh failed (null/unsuccessful response)")
-                }
-            } catch (e: Exception) {
-                Log.e("RemoteControlVM", "❌ Token refresh error: ${e.message}", e)
-            } finally {
-                tokenRefreshInProgress = false
-            }
-        }
-    }
-
-    private fun buildRelayUrlFallback(): String {
-        val baseUrl = BuildConfig.WEBVIEW_BASEURL.takeIf { it.isNotBlank() } ?: "https://kiosk.mugshot.dev"
-        return baseUrl.replace("https://", "wss://").replace("http://", "ws://") + "/remote-control-ws"
     }
 
     /**
